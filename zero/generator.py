@@ -1,5 +1,3 @@
-import random
-
 from .parser import *
 
 def unroll_loop_statements(statement):
@@ -65,7 +63,6 @@ def compute_execution_paths(statement):
   statement = unroll_loop_statements(statement)
   for visited in compute_visited_paths(statement):
     yield list(construct_execution_path(statement, visited))
-  # handle loop
 
 def generate_execution_paths(root):
   for contract in root.nodes:

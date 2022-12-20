@@ -1,6 +1,8 @@
 from z3 import *
 from .generator import *
 
+MAX_UINT = Literal('number', str(2**256-1))
+
 def sort_for_type_name(type_name):
   if isinstance(type_name, ElementaryTypeName):
     if type_name.name.startswith('uint') or type_name.name == 'address':
@@ -126,6 +128,12 @@ class VariableRef:
     constraint = And([self.constraint, other.constraint])
     return VariableRef(type_name, val, constraint)
 
+  def __ne__(self, other):
+    type_name = ElementaryTypeName('bool')
+    val = self.val != other.val
+    constraint = And([self.constraint, other.constraint])
+    return VariableRef(type_name, val, constraint)
+
   def __not__(self):
     type_name = ElementaryTypeName('bool')
     val = Not(self.val)
@@ -184,8 +192,10 @@ class VariableRef:
 
 @dataclass
 class StateRef:
-  variables: dict
-  conditions: List[Any]
+  variables: dict = field(default_factory=lambda : {})
+  conditions: Optional[VariableRef] = field(default=None)
+  runtime_reverts: Optional[VariableRef] = None
+  arith_check: bool = True
 
   def mk_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
@@ -206,7 +216,16 @@ class StateRef:
     self.variables[name] = var
 
   def add_condition(self, condition):
-    self.conditions.append(condition)
+    if self.conditions is None:
+      self.conditions = condition
+    else:
+      self.conditions = self.conditions & condition
+
+  def add_runtime_revert(self, revert):
+    if self.runtime_reverts is None:
+      self.runtime_reverts = revert
+    else:
+      self.runtime_reverts = self.runtime_reverts | (self.conditions & revert)
 
 def visit_assignment(exp, state):
   left = exp.left_hand_side
@@ -234,10 +253,19 @@ def visit_binary_operation(exp, state):
   left_expression = visit_expression(exp.left_expression, state)
   right_expression = visit_expression(exp.right_expression, state)
   if exp.operator == '+':
+    if state.arith_check:
+      state.add_runtime_revert(left_expression + right_expression > visit_expression(MAX_UINT, state))
+      state.add_condition(left_expression + right_expression <= visit_expression(MAX_UINT, state))
     return left_expression + right_expression
   if exp.operator == '-':
+    if state.arith_check:
+      state.add_runtime_revert(left_expression < right_expression)
+      state.add_condition(left_expression >= right_expression)
     return left_expression - right_expression
   if exp.operator == '*':
+    if state.arith_check:
+      state.add_runtime_revert(left_expression * right_expression > visit_expression(MAX_UINT, state))
+      state.add_condition(left_expression * right_expression <= visit_expression(MAX_UINT, state))
     return left_expression * right_expression
   if exp.operator == '>':
     return left_expression > right_expression
@@ -249,6 +277,8 @@ def visit_binary_operation(exp, state):
     return left_expression >= right_expression
   if exp.operator == '==':
     return left_expression == right_expression
+  if exp.operator == '!=':
+    return left_expression != right_expression
   if exp.operator == '||':
     return left_expression | right_expression
   if exp.operator == '&&':
@@ -273,6 +303,10 @@ def visit_identifier(exp, state):
   return state.fetch_const(exp.name)
 
 def visit_literal(exp, _):
+  if exp.kind == 'bool':
+    type_name = ElementaryTypeName('bool')
+    value = BoolVal(exp.value == 'true')
+    return VariableRef(type_name, value)
   if exp.kind == 'number':
     type_name = ElementaryTypeName('uint')
     value = IntVal(int(exp.value))
@@ -285,13 +319,16 @@ def visit_function_call(exp, state):
       return visit_expression(exp.arguments[0], state)
   if exp.kind == 'functionCall':
     if isinstance(exp.expression, Identifier):
+      if exp.expression.name == 'over_uint':
+        return visit_expression(exp.arguments[0], state) > visit_literal(MAX_UINT, state)
       if exp.expression.name == 'require':
         condition = visit_expression(exp.arguments[0], state)
+        state.add_runtime_revert(condition.__not__())
         state.add_condition(condition)
         return
       if exp.expression.name == 'assert':
         assertion = visit_expression(exp.arguments[0], state)
-        pre = And([And([x.constraint, x.val]) for x in state.conditions] + [assertion.constraint])
+        pre = And([state.conditions.constraint, state.conditions.val, assertion.constraint])
         post = assertion.val
         solver = Solver()
         solver.add(Not(Implies(pre, post)))
@@ -332,7 +369,7 @@ def visit_expression(exp, state):
 
 def validate(root):
   for resources, parameters, returns, path in generate_execution_paths(root):
-    state = StateRef({}, [])
+    state = StateRef()
     # state variables
     Msg = UserDefinedTypeName('Msg', StructDefinition('Msg', [
       VariableDeclaration('sender', ElementaryTypeName('address')),
@@ -347,8 +384,19 @@ def validate(root):
     for var in returns:
       state.mk_default_const(var.name, var.type_name)
     # start validating every execution paths
+    ensures = []
+    reverts_ifs = []
+    reverts_ifs = VariableRef(ElementaryTypeName('bool'), BoolVal(False), BoolVal(True))
     for statement in path:
       if isinstance(statement, ExpressionStatement):
+        if isinstance(statement.expression, FunctionCall):
+          call = statement.expression
+          if isinstance(call.expression, Identifier):
+            if call.expression.name == 'reverts_if':
+              state.arith_check = False
+              reverts_ifs = reverts_ifs | visit_expression(call.arguments[0], state)
+              state.arith_check = True
+              continue
         visit_expression(statement.expression, state)
       elif isinstance(statement, VariableDeclarationStatement):
         declarations = []
@@ -364,3 +412,14 @@ def validate(root):
       else:
         condition = visit_expression(statement, state)
         state.add_condition(condition)
+    # It is time to validate
+    print('> check reverts_if')
+    if state.runtime_reverts:
+      solver = Solver()
+      solver.add(And([state.runtime_reverts.val, state.runtime_reverts.constraint]))
+      if solver.check() == sat:
+        pre = And([reverts_ifs.val, reverts_ifs.constraint, state.runtime_reverts.constraint])
+        post = state.runtime_reverts.val
+        solver.reset()
+        solver.add(Not(Implies(pre, post)))
+        print(solver.check())

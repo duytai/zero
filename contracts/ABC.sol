@@ -1,18 +1,17 @@
-contract ABC {
-    mapping(address => uint256) balances;
-    function batchTransfer(address[] memory _receivers, uint256 _value) public returns (bool) {
-        uint cnt = _receivers.length;
-        uint256 amount = uint256(cnt) * _value;
-        require(cnt > 0 && cnt <= 20);
-        require(_value > 0 && balances[msg.sender] >= amount);
+contract TestSuite {
+    function reverts_if(bool) internal pure;
+    function ensures(bool, bool) internal pure;
+    function old_uint(uint) internal pure returns(uint);
+    function old_address(address) internal pure returns(address);
+    function over_uint(uint) internal pure returns(bool);
+    function under_uint(uint) internal pure returns(bool);
+    function sum_uint(mapping(address => uint) memory) internal pure returns(uint);
+}
 
-        uint x = balances[msg.sender];
-        balances[msg.sender] = balances[msg.sender] - amount;
-        uint i;
-        for (i = 0; i < cnt; i++) {
-            balances[_receivers[i]] = balances[_receivers[i]] - _value;
-        }
-        assert(i >= 2);
-        return true;
+contract ABC is TestSuite {
+    mapping(address => uint256) balances;
+    function add(uint x, uint y) public returns(uint z) {
+        ensures(true, z == x + y);
+        z = x + y;
     }
 }

@@ -1,5 +1,5 @@
 from typing import List, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class ElementaryTypeName:
