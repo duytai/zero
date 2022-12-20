@@ -98,9 +98,9 @@ class VariableDeclarationStatement:
 
 @dataclass
 class ForStatement:
-  init: Optional[Any]
-  condition: Optional[Any]
-  loop: Optional[Any]
+  init: Any
+  condition: Any
+  loop: Any
   body: Any
 
 @dataclass
@@ -251,9 +251,9 @@ def parse(node):
     return VariableDeclarationStatement(declarations, initial_value)
 
   if node['nodeType'] == 'ForStatement':
-    init = parse(node['initializationExpression']) if node['initializationExpression'] else None
-    condition = parse(node['condition']) if node['condition'] else None
-    loop = parse(node['loopExpression']) if node['loopExpression'] else None
+    init = parse(node['initializationExpression'])
+    condition = parse(node['condition'])
+    loop = parse(node['loopExpression'])
     body = parse(node['body'])
     return ForStatement(init, condition, loop, body)
 

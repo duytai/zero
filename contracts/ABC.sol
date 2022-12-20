@@ -8,10 +8,11 @@ contract ABC {
 
         uint x = balances[msg.sender];
         balances[msg.sender] = balances[msg.sender] - amount;
-        assert(balances[msg.sender] >= amount || cnt <= 20 && cnt > 0);
-        for (uint i = 0; i < cnt; i++) {
+        uint i;
+        for (i = 0; i < cnt; i++) {
             balances[_receivers[i]] = balances[_receivers[i]] - _value;
         }
+        assert(i >= 2);
         return true;
     }
 }

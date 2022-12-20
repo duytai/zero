@@ -163,14 +163,24 @@ class VariableRef:
     return VariableRef(type_name, val, constraint)
 
   def __getitem__(self, item):
-    type_name = self.type_name.value_type
-    val = self.val[item.val]
-    constraint = And([
-      constraint_for_type_name(val, type_name),
-      self.constraint,
-      item.constraint
-    ])
-    return VariableRef(type_name, val, constraint)
+    if isinstance(self.type_name, Mapping):
+      type_name = self.type_name.value_type
+      val = self.val[item.val]
+      constraint = And([
+        constraint_for_type_name(val, type_name),
+        self.constraint,
+        item.constraint
+      ])
+      return VariableRef(type_name, val, constraint)
+    if isinstance(self.type_name, ArrayTypeName):
+      type_name = self.type_name.base_type
+      val = self.val[item.val]
+      constraint = And([
+        constraint_for_type_name(val, type_name),
+        self.constraint,
+        item.constraint
+      ])
+      return VariableRef(type_name, val, constraint)
 
 @dataclass
 class StateRef:
@@ -199,23 +209,26 @@ class StateRef:
     self.conditions.append(condition)
 
 def visit_assignment(exp, state):
-  if exp.operator == '=':
-    left = exp.left_hand_side
-    right = visit_expression(exp.right_hand_side, state)
-    while not isinstance(left, Identifier):
-      if isinstance(left, IndexAccess):
-        base = visit_expression(left.base_expression, state)
-        index = visit_expression(left.index_expression, state)
-        #
-        type_name = base.type_name
-        val = Store(base.val, index.val, right.val)
-        constraint = And([base.constraint, index.constraint, right.constraint])
-        right = VariableRef(type_name, val, constraint)
-        left = left.base_expression
-      else:
-        raise ValueError(left)
-    return state.store_const(left.name, right)
-  raise ValueError(exp)
+  left = exp.left_hand_side
+  right = visit_expression(exp.right_hand_side, state)
+  if exp.operator == '+=':
+    right = visit_expression(exp.left_hand_side, state) + visit_expression(exp.right_hand_side, state)
+  if exp.operator == '-=':
+    right = visit_expression(exp.left_hand_side, state) - visit_expression(exp.right_hand_side, state)
+  # TODO: handle assignment
+  while not isinstance(left, Identifier):
+    if isinstance(left, IndexAccess):
+      base = visit_expression(left.base_expression, state)
+      index = visit_expression(left.index_expression, state)
+      #
+      type_name = base.type_name
+      val = Store(base.val, index.val, right.val)
+      constraint = And([base.constraint, index.constraint, right.constraint])
+      right = VariableRef(type_name, val, constraint)
+      left = left.base_expression
+    else:
+      raise ValueError(left)
+  return state.store_const(left.name, right)
 
 def visit_binary_operation(exp, state):
   left_expression = visit_expression(exp.left_expression, state)
@@ -246,6 +259,10 @@ def visit_unary_operation(exp, state):
   sub_expression = visit_expression(exp.sub_expression, state)
   if exp.operator == '!':
     return sub_expression.__not__()
+  if exp.operator == '++':
+    assignment = Assignment(exp.sub_expression, Literal('number', '1'), '+=')
+    visit_assignment(assignment, state)
+    return visit_expression(exp.sub_expression, state)
   raise ValueError(exp.operator)
 
 def visit_tuple_expression(exp, state):

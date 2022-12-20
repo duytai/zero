@@ -1,4 +1,28 @@
+import random
+
 from .parser import *
+
+def unroll_loop_statements(statement):
+  if isinstance(statement, Block):
+    return Block([unroll_loop_statements(x) for x in statement.statements])
+  elif isinstance(statement, IfStatement):
+    return IfStatement(
+      statement.condition,
+      unroll_loop_statements(statement.true_body),
+      unroll_loop_statements(statement.false_body) if statement.false_body else None
+    )
+  elif isinstance(statement, ForStatement):
+    num_unrolled = 2
+    return Block([
+      statement.init,
+      Block(num_unrolled * [
+        statement.condition,
+        statement.body,
+        statement.loop,
+      ]),
+      UnaryOperation(statement.condition, True, '!'),
+    ])
+  return statement
 
 def count_if_statements(statement):
   if isinstance(statement, Block):
@@ -25,7 +49,7 @@ def construct_execution_path(statement, path=[]):
   else:
     yield statement
 
-def compute_execution_paths(statement):
+def compute_visited_paths(statement):
   num_ifs = sum(count_if_statements(statement))
   visited_paths = [[]]
   for x in range(num_ifs):
@@ -35,7 +59,11 @@ def compute_execution_paths(statement):
       false_branch = visited[::] + [False]
       tmp = tmp + [true_branch, false_branch]
     visited_paths = tmp
-  for visited in visited_paths:
+  return visited_paths
+
+def compute_execution_paths(statement):
+  statement = unroll_loop_statements(statement)
+  for visited in compute_visited_paths(statement):
     yield list(construct_execution_path(statement, visited))
   # handle loop
 
