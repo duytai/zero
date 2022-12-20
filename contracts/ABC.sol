@@ -1,8 +1,14 @@
 contract ABC {
+    struct OK {
+        address sender;
+        uint value;
+    }
+    OK ok;
     mapping(address => uint) balances;
-    function add(uint x, uint y) public returns (uint z) {
-        y = 20;
-        x = y + 1;
-        assert((x == 21 && y == 20) && (z == 0));
+    function add(address to, uint value) public returns (uint z) {
+        value = 10;
+        if (balances[msg.sender] >= value + ok.value) {
+            assert(balances[msg.sender] >= 10);
+        }
     }
 }

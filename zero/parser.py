@@ -11,6 +11,11 @@ class Mapping:
   value_type: Any
 
 @dataclass
+class UserDefinedTypeName:
+  name: str
+  referenced: Any
+
+@dataclass
 class BinaryOperation:
   left_expression: Any
   right_expression: Any
@@ -48,6 +53,16 @@ class FunctionCall:
   arguments: List[Any]
 
 @dataclass
+class IndexAccess:
+  index_expression: Any
+  base_expression: Any
+
+@dataclass
+class MemberAccess:
+  member_name: str
+  expression: Any
+
+@dataclass
 class VariableDeclaration:
   name: str
   type_name: Any
@@ -79,8 +94,15 @@ class ContractDefinition:
   nodes: List[Any]
 
 @dataclass
+class StructDefinition:
+  name: str
+  members: List[VariableDeclaration]
+
+@dataclass
 class SourceUnit:
   nodes: List[Any]
+
+struct_definitions = {}
 
 def parse(node):
   if node['nodeType'] == 'SourceUnit':
@@ -163,5 +185,27 @@ def parse(node):
     key_type = parse(node['keyType'])
     value_type = parse(node['valueType'])
     return Mapping(key_type, value_type)
+
+  if node['nodeType'] == 'IndexAccess':
+    index_expression = parse(node['indexExpression'])
+    base_expression = parse(node['baseExpression'])
+    return IndexAccess(index_expression, base_expression)
+
+  if node['nodeType'] == 'MemberAccess':
+    member_name = node['memberName']
+    expression = parse(node['expression'])
+    return MemberAccess(member_name, expression)
+
+  if node['nodeType'] == 'StructDefinition':
+    name = node['name']
+    members = [parse(x) for x in node['members']]
+    tmp = StructDefinition(name, members)
+    struct_definitions[name] = tmp
+    return tmp
+
+  if node['nodeType'] == 'UserDefinedTypeName':
+    name = node['name']
+    referenced = struct_definitions[name]
+    return UserDefinedTypeName(name, referenced)
 
   raise ValueError(node['nodeType'])

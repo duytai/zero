@@ -42,8 +42,9 @@ def compute_execution_paths(statement):
 def generate_execution_paths(root):
   for contract in root.nodes:
     if isinstance(contract, ContractDefinition):
-      for func in contract.nodes:
-        if isinstance(func, FunctionDefinition):
-          if func.body:
-            for path in compute_execution_paths(func.body):
-              yield func.parameters, func.returns, path
+      resources = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
+      for part in contract.nodes:
+        if isinstance(part, FunctionDefinition):
+          if part.body:
+            for path in compute_execution_paths(part.body):
+              yield resources, part.parameters, part.returns, path
