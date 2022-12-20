@@ -16,6 +16,11 @@ class UserDefinedTypeName:
   referenced: Any
 
 @dataclass
+class ArrayTypeName:
+  base_type: Any
+  length: Optional[int]
+
+@dataclass
 class BinaryOperation:
   left_expression: Any
   right_expression: Any
@@ -63,6 +68,10 @@ class MemberAccess:
   expression: Any
 
 @dataclass
+class ElementaryTypeNameExpression:
+  name: str
+
+@dataclass
 class VariableDeclaration:
   name: str
   type_name: Any
@@ -83,10 +92,26 @@ class ExpressionStatement:
   expression: Any
 
 @dataclass
+class VariableDeclarationStatement:
+  declarations: List[VariableDeclaration]
+  initial_value: Optional[Any]
+
+@dataclass
+class ForStatement:
+  init: Optional[Any]
+  condition: Optional[Any]
+  loop: Optional[Any]
+  body: Any
+
+@dataclass
 class IfStatement:
   condition: Any
   true_body: Any
   false_body: Any
+
+@dataclass
+class Return:
+  expression: Optional[Any]
 
 @dataclass
 class ContractDefinition:
@@ -103,8 +128,10 @@ class SourceUnit:
   nodes: List[Any]
 
 struct_definitions = {}
+name_counter = 0
 
 def parse(node):
+
   if node['nodeType'] == 'SourceUnit':
     nodes = [parse(x) for x in node['nodes']]
     return SourceUnit(nodes)
@@ -122,7 +149,12 @@ def parse(node):
     return FunctionDefinition(name, parameters, returns, body)
 
   if node['nodeType'] == 'VariableDeclaration':
-    name = node['name']
+    global name_counter
+    if not node['name']:
+      name = f'r{name_counter}'
+      name_counter += 1
+    else:
+      name = node['name']
     type_name = parse(node['typeName'])
     return VariableDeclaration(name, type_name)
 
@@ -207,5 +239,29 @@ def parse(node):
     name = node['name']
     referenced = struct_definitions[name]
     return UserDefinedTypeName(name, referenced)
+
+  if node['nodeType'] == 'ArrayTypeName':
+    base_type = parse(node['baseType'])
+    length = int(node['length']) if node['length'] else None
+    return ArrayTypeName(base_type, length)
+
+  if node['nodeType'] == 'VariableDeclarationStatement':
+    declarations = [parse(x) for x in node['declarations']]
+    initial_value = parse(node['initialValue']) if node['initialValue'] else None
+    return VariableDeclarationStatement(declarations, initial_value)
+
+  if node['nodeType'] == 'ForStatement':
+    init = parse(node['initializationExpression']) if node['initializationExpression'] else None
+    condition = parse(node['condition']) if node['condition'] else None
+    loop = parse(node['loopExpression']) if node['loopExpression'] else None
+    body = parse(node['body'])
+    return ForStatement(init, condition, loop, body)
+
+  if node['nodeType'] == 'Return':
+    expression = parse(node['expression']) if node['expression'] else None
+    return Return(expression)
+
+  if node['nodeType'] == 'ElementaryTypeNameExpression':
+    return ElementaryTypeNameExpression(node['typeName'])
 
   raise ValueError(node['nodeType'])

@@ -5,6 +5,8 @@ def sort_for_type_name(type_name):
   if isinstance(type_name, ElementaryTypeName):
     if type_name.name.startswith('uint') or type_name.name == 'address':
       return IntSort()
+    if type_name.name == 'bool':
+      return BoolSort()
   if isinstance(type_name, Mapping):
     key_sort = sort_for_type_name(type_name.key_type)
     value_sort = sort_for_type_name(type_name.value_type)
@@ -15,6 +17,10 @@ def sort_for_type_name(type_name):
       members = [(x.name, sort_for_type_name(x.type_name)) for x in type_name.referenced.members]
       dt.declare('data', *members)
       return dt.create()
+  if isinstance(type_name, ArrayTypeName):
+    key_sort = IntSort()
+    value_sort = sort_for_type_name(type_name.base_type)
+    return ArraySort(key_sort, value_sort)
   raise ValueError(type_name)
 
 def constraint_for_type_name(value, type_name):
@@ -33,12 +39,20 @@ def constraint_for_type_name(value, type_name):
         constraint = constraint_for_type_name(member, var.type_name)
         constraints.append(constraint)
       return And(constraints)
+  if isinstance(type_name, ArrayTypeName):
+    key = FreshConst(IntSort())
+    constraint = ForAll(key, constraint_for_type_name(value[key], type_name.base_type))
+    if type_name.length:
+      return And([key <= IntVal(type_name.length), key >= 0, constraint])
+    return And([key >= 0, constraint])
   raise ValueError((value, type_name))
 
 def default_for_type_name(value, type_name):
   if isinstance(type_name, ElementaryTypeName):
     if type_name.name.startswith('uint'):
       return value == 0
+    if type_name.name == 'bool':
+      return value == BoolVal(False)
   raise ValueError((value, type_name))
 
 @dataclass
@@ -48,6 +62,16 @@ class VariableRef:
   constraint: Any = BoolVal(True)
 
   def __post_init__(self):
+    if isinstance(self.type_name, ArrayTypeName):
+      type_name = ElementaryTypeName('uint')
+      name = f'{self.val.sexpr()}.length'
+      val = Const(name, IntSort())
+      constraint = constraint_for_type_name(val, type_name)
+      if self.type_name.length:
+        constraint = And([constraint, val < self.type_name.length])
+      tmp = VariableRef(type_name, val, constraint)
+      setattr(self, 'length', tmp)
+
     if isinstance(self.type_name, UserDefinedTypeName):
       if isinstance(self.type_name.referenced, StructDefinition):
         for idx, var in enumerate(self.type_name.referenced.members):
@@ -63,6 +87,12 @@ class VariableRef:
   def __lt__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val < other.val
+    constraint = And([self.constraint, other.constraint])
+    return VariableRef(type_name, val, constraint)
+
+  def __le__(self, other):
+    type_name = ElementaryTypeName('bool')
+    val = self.val <= other.val
     constraint = And([self.constraint, other.constraint])
     return VariableRef(type_name, val, constraint)
 
@@ -112,6 +142,26 @@ class VariableRef:
     ])
     return VariableRef(type_name, val, constraint)
 
+  def __mul__(self, other):
+    type_name = self.type_name
+    val = self.val * other.val
+    constraint = And([
+      constraint_for_type_name(val, type_name),
+      self.constraint,
+      other.constraint
+    ])
+    return VariableRef(type_name, val, constraint)
+
+  def __sub__(self, other):
+    type_name = self.type_name
+    val = self.val - other.val
+    constraint = And([
+      constraint_for_type_name(val, type_name),
+      self.constraint,
+      other.constraint
+    ])
+    return VariableRef(type_name, val, constraint)
+
   def __getitem__(self, item):
     type_name = self.type_name.value_type
     val = self.val[item.val]
@@ -149,10 +199,22 @@ class StateRef:
     self.conditions.append(condition)
 
 def visit_assignment(exp, state):
-  left_hand_side = exp.left_hand_side
-  right_hand_side = visit_expression(exp.right_hand_side, state)
-  if isinstance(left_hand_side, Identifier):
-    return state.store_const(left_hand_side.name, right_hand_side)
+  if exp.operator == '=':
+    left = exp.left_hand_side
+    right = visit_expression(exp.right_hand_side, state)
+    while not isinstance(left, Identifier):
+      if isinstance(left, IndexAccess):
+        base = visit_expression(left.base_expression, state)
+        index = visit_expression(left.index_expression, state)
+        #
+        type_name = base.type_name
+        val = Store(base.val, index.val, right.val)
+        constraint = And([base.constraint, index.constraint, right.constraint])
+        right = VariableRef(type_name, val, constraint)
+        left = left.base_expression
+      else:
+        raise ValueError(left)
+    return state.store_const(left.name, right)
   raise ValueError(exp)
 
 def visit_binary_operation(exp, state):
@@ -160,10 +222,16 @@ def visit_binary_operation(exp, state):
   right_expression = visit_expression(exp.right_expression, state)
   if exp.operator == '+':
     return left_expression + right_expression
+  if exp.operator == '-':
+    return left_expression - right_expression
+  if exp.operator == '*':
+    return left_expression * right_expression
   if exp.operator == '>':
     return left_expression > right_expression
   if exp.operator == '<':
     return left_expression < right_expression
+  if exp.operator == '<=':
+    return left_expression <= right_expression
   if exp.operator == '>=':
     return left_expression >= right_expression
   if exp.operator == '==':
@@ -195,16 +263,25 @@ def visit_literal(exp, _):
   raise ValueError(exp.kind)
 
 def visit_function_call(exp, state):
-  if isinstance(exp.expression, Identifier):
-    if exp.expression.name == 'assert':
-      assertion = visit_expression(exp.arguments[0], state)
-      pre = And([And([x.constraint, x.val]) for x in state.conditions] + [assertion.constraint])
-      post = assertion.val
-      solver = Solver()
-      solver.add(Not(Implies(pre, post)))
-      print(solver.check())
-      print(assertion.val)
-      return
+  if exp.kind == 'typeConversion':
+    if isinstance(exp.expression, ElementaryTypeNameExpression):
+      return visit_expression(exp.arguments[0], state)
+  if exp.kind == 'functionCall':
+    if isinstance(exp.expression, Identifier):
+      if exp.expression.name == 'require':
+        condition = visit_expression(exp.arguments[0], state)
+        state.add_condition(condition)
+        return
+      if exp.expression.name == 'assert':
+        assertion = visit_expression(exp.arguments[0], state)
+        pre = And([And([x.constraint, x.val]) for x in state.conditions] + [assertion.constraint])
+        post = assertion.val
+        solver = Solver()
+        solver.add(Not(Implies(pre, post)))
+        print(solver.check())
+        print(assertion.val)
+        return
+  raise ValueError(exp)
 
 def visit_index_access(exp, state):
   index_expression = visit_expression(exp.index_expression, state)
@@ -256,6 +333,17 @@ def validate(root):
     for statement in path:
       if isinstance(statement, ExpressionStatement):
         visit_expression(statement.expression, state)
+      elif isinstance(statement, VariableDeclarationStatement):
+        declarations = []
+        for var in statement.declarations:
+          state.mk_default_const(var.name, var.type_name)
+          declarations.append(var.name)
+        if statement.initial_value:
+          init = visit_expression(statement.initial_value, state)
+          for name, val in zip(declarations, init if is_array(init) else [init]):
+            state.store_const(name, val)
+      elif isinstance(statement, Return):
+        pass # TODO
       else:
         condition = visit_expression(statement, state)
         state.add_condition(condition)
