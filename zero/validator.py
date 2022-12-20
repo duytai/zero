@@ -1,5 +1,6 @@
 from z3 import *
 from .generator import *
+from copy import deepcopy
 
 MAX_UINT = Literal('number', str(2**256-1))
 
@@ -196,6 +197,14 @@ class StateRef:
   conditions: Optional[VariableRef] = field(default=None)
   runtime_reverts: Optional[VariableRef] = None
   arith_check: bool = True
+  prev_check_point: Optional[Any] = None
+
+  def save_check_point(self):
+    variables = deepcopy(self.variables)
+    conditions = deepcopy(self.conditions)
+    runtime_reverts = deepcopy(self.runtime_reverts)
+    arith_check = deepcopy(self.arith_check)
+    self.prev_check_point = StateRef(variables, conditions, runtime_reverts, arith_check)
 
   def mk_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
@@ -319,6 +328,8 @@ def visit_function_call(exp, state):
       return visit_expression(exp.arguments[0], state)
   if exp.kind == 'functionCall':
     if isinstance(exp.expression, Identifier):
+      if exp.expression.name.startswith('old_'):
+        return visit_expression(exp.arguments[0], state.prev_check_point)
       if exp.expression.name == 'over_uint':
         return visit_expression(exp.arguments[0], state) > visit_literal(MAX_UINT, state)
       if exp.expression.name == 'require':
@@ -333,7 +344,6 @@ def visit_function_call(exp, state):
         solver = Solver()
         solver.add(Not(Implies(pre, post)))
         print(solver.check())
-        print(assertion.val)
         return
   raise ValueError(exp)
 
@@ -383,19 +393,22 @@ def validate(root):
     # returns
     for var in returns:
       state.mk_default_const(var.name, var.type_name)
+    state.save_check_point()
+
     # start validating every execution paths
     ensures = []
-    reverts_ifs = []
-    reverts_ifs = VariableRef(ElementaryTypeName('bool'), BoolVal(False), BoolVal(True))
+    reverts = []
+
     for statement in path:
       if isinstance(statement, ExpressionStatement):
         if isinstance(statement.expression, FunctionCall):
           call = statement.expression
           if isinstance(call.expression, Identifier):
             if call.expression.name == 'reverts_if':
-              state.arith_check = False
-              reverts_ifs = reverts_ifs | visit_expression(call.arguments[0], state)
-              state.arith_check = True
+              reverts += call.arguments
+              continue
+            if call.expression.name == 'ensures':
+              ensures.append(tuple(call.arguments))
               continue
         visit_expression(statement.expression, state)
       elif isinstance(statement, VariableDeclarationStatement):
@@ -408,18 +421,33 @@ def validate(root):
           for name, val in zip(declarations, init if is_array(init) else [init]):
             state.store_const(name, val)
       elif isinstance(statement, Return):
-        pass # TODO
+        if statement.expression:
+          init = visit_expression(statement.expression, state)
+          for r, val in zip(returns, init if is_array(init) else [init]):
+            state.store_const(r.name, val)
       else:
         condition = visit_expression(statement, state)
         state.add_condition(condition)
+
     # It is time to validate
-    print('> check reverts_if')
-    if state.runtime_reverts:
+    print('> reverts')
+    for e in reverts:
+      revert = visit_expression(e, state.prev_check_point)
+      assertion = Implies(
+        And([revert.val, revert.constraint, state.runtime_reverts.constraint]),
+        state.runtime_reverts.val
+      )
       solver = Solver()
-      solver.add(And([state.runtime_reverts.val, state.runtime_reverts.constraint]))
-      if solver.check() == sat:
-        pre = And([reverts_ifs.val, reverts_ifs.constraint, state.runtime_reverts.constraint])
-        post = state.runtime_reverts.val
-        solver.reset()
-        solver.add(Not(Implies(pre, post)))
-        print(solver.check())
+      solver.add(Not(assertion))
+      print(solver.check())
+
+    # It is time for ensures
+    print('> ensures')
+    for pre, post in ensures:
+      pre = visit_expression(pre, state.prev_check_point)
+      post = visit_expression(post, state)
+      assertion = Implies(And([pre.val, pre.constraint]), post.val)
+      solver = Solver()
+      solver.add(Not(assertion))
+      print(solver.check())
+

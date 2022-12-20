@@ -12,6 +12,11 @@ contract ABC is TestSuite {
     mapping(address => uint256) balances;
     function add(uint x, uint y) public returns(uint z) {
         ensures(true, z == x + y);
-        z = x + y;
+        return x + y;
+    }
+
+    function test() public returns(uint z) {
+        ensures(true, z == 30);
+        z = add(10, 20);
     }
 }
