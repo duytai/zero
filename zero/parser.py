@@ -1,5 +1,7 @@
 from typing import List, Any, Optional
 from dataclasses import dataclass, field
+from itertools import islice
+from functools import partial
 
 @dataclass
 class ElementaryTypeName:
@@ -82,6 +84,7 @@ class FunctionDefinition:
   parameters: List[VariableDeclaration]
   returns: List[VariableDeclaration]
   body: Optional[Any]
+  ensures: Optional[Any]
 
 @dataclass
 class Block:
@@ -127,8 +130,187 @@ class StructDefinition:
 class SourceUnit:
   nodes: List[Any]
 
-struct_definitions = {}
-name_counter = 0
+class ExpVisitor:
+  def visit_binary_operation(self, exp):
+    return BinaryOperation(
+      self.visit_expression(exp.left_expression),
+      self.visit_expression(exp.right_expression),
+      exp.operator
+    )
+
+  def visit_unary_operation(self, exp):
+    return UnaryOperation(
+      self.visit_expression(exp.sub_expression),
+      exp.prefix,
+      exp.operator
+    )
+
+  def visit_tuple_expression(self, exp):
+    return TupleExpression(
+      [self.visit_expression(x) for x in exp.components]
+    )
+
+  def visit_assignment(self, exp):
+    return Assignment(
+      self.visit_expression(exp.left_hand_side),
+      self.visit_expression(exp.right_hand_side),
+      exp.operator
+    )
+
+  def visit_identifier(self, exp):
+    return Identifier(exp.name)
+
+  def visit_literal(self, exp):
+    return Literal(exp.kind, exp.value)
+
+  def visit_function_call(self, exp):
+    return FunctionCall(
+      exp.kind,
+      self.visit_expression(exp.expression),
+      [self.visit_expression(x) for x in exp.arguments]
+    )
+
+  def visit_index_access(self, exp):
+    return IndexAccess(
+      self.visit_expression(exp.index_expression),
+      self.visit_expression(exp.base_expression)
+    )
+
+  def visit_member_access(self, exp):
+    return MemberAccess(
+      exp.member_name,
+      self.visit_expression(exp.expression)
+    )
+
+  def visit_elementary_type_name_expression(self, exp):
+    return ElementaryTypeNameExpression(exp.name)
+
+  def visit_expression(self, exp):
+    if isinstance(exp, BinaryOperation):
+      return self.visit_binary_operation(exp)
+    if isinstance(exp, UnaryOperation):
+      return self.visit_unary_operation(exp)
+    if isinstance(exp, TupleExpression):
+      return self.visit_tuple_expression(exp)
+    if isinstance(exp, Assignment):
+      return self.visit_assignment(exp)
+    if isinstance(exp, Identifier):
+      return self.visit_identifier(exp)
+    if isinstance(exp, Literal):
+      return self.visit_literal(exp)
+    if isinstance(exp, FunctionCall):
+      return self.visit_function_call(exp)
+    if isinstance(exp, IndexAccess):
+      return self.visit_index_access(exp)
+    if isinstance(exp, MemberAccess):
+      return self.visit_member_access(exp)
+    if isinstance(exp, ElementaryTypeNameExpression):
+      return self.visit_elementary_type_name_expression(exp)
+    raise ValueError(exp)
+
+class GlobalName:
+  _instance = None
+  counter = 0
+
+  def __new__(cls):
+    if not cls._instance:
+      cls._instance = super(GlobalName, cls).__new__(cls)
+    return cls._instance
+
+  def names(self):
+    while True:
+      self.counter += 1
+      yield f'tmp_{self.counter}'
+
+class AlterOld(ExpVisitor):
+  def __init__(self):
+    self.declarations = []
+    self.modifies = []
+
+  def visit_function_call(self, exp):
+    gn = GlobalName()
+    ident = exp.expression
+    if isinstance(ident, Identifier):
+      if ident.name == 'old_uint':
+        names = list(islice(gn.names(), 1))
+        self.declarations.append(
+          VariableDeclarationStatement([
+            VariableDeclaration(names[0], ElementaryTypeName('uint')),
+          ], self.visit_expression(exp.arguments[0]))
+        )
+        self.modifies.append(
+          ExpressionStatement(
+            FunctionCall('functionCall', Identifier('modifies'), exp.arguments)
+          )
+        )
+        return Identifier(names[0])
+    return exp
+
+class AlterIdent(ExpVisitor):
+  def __init__(self, data):
+    self.data = data
+
+  def visit_identifier(self, exp):
+    if exp.name in self.data:
+      return Identifier(self.data[exp.name])
+    return exp
+
+def parse_ensures(ensures, parameters, returns, arguments):
+  pre_statements = []
+  mod_statements = []
+  post_statements = []
+  assume_statements = []
+  gn = GlobalName()
+
+  for pre, post in ensures:
+    alter = AlterOld()
+    names = list(islice(gn.names(), 2))
+    pre_statements.append(
+      VariableDeclarationStatement([
+        VariableDeclaration(names[0], ElementaryTypeName('bool'))
+      ], alter.visit_expression(pre))
+    )
+    post_statements.append(
+      VariableDeclarationStatement([
+        VariableDeclaration(names[1], ElementaryTypeName('bool'))
+      ], alter.visit_expression(post))
+    )
+    assume_statements.append(
+      ExpressionStatement(
+        FunctionCall('functionCall', Identifier('assume'), [
+          BinaryOperation(
+            Identifier(names[0]),
+            Identifier(names[1]),
+            '=>'
+          )
+        ])
+      )
+    )
+    pre_statements += alter.declarations
+    mod_statements += alter.modifies
+
+  body = []
+  data = {}
+  for k, v in zip(parameters + returns, arguments):
+    data[k.name] = next(gn.names())
+    body.append(
+      VariableDeclarationStatement([
+        VariableDeclaration(data[k.name], k.type_name)
+      ], v)
+    )
+  alter = AlterIdent(data)
+
+  for stmt in pre_statements + mod_statements + post_statements + assume_statements:
+    if isinstance(stmt, ExpressionStatement):
+      stmt.expression = alter.visit_expression(stmt.expression)
+    elif isinstance(stmt, VariableDeclarationStatement):
+      if stmt.initial_value:
+        stmt.initial_value = alter.visit_expression(stmt.initial_value)
+    else:
+      raise ValueError(stmt)
+    body.append(stmt)
+
+  return Block(body)
 
 def parse(node):
 
@@ -146,15 +328,28 @@ def parse(node):
     parameters = [parse(x) for x in node['parameters']['parameters']]
     returns = [parse(x) for x in node['returnParameters']['parameters']]
     body = parse(node['body']) if node['body'] else None
-    return FunctionDefinition(name, parameters, returns, body)
+    ensures = None
+
+    if body:
+      statements = []
+      data = []
+      for stmt in body.statements:
+        if isinstance(stmt, ExpressionStatement):
+          call = stmt.expression
+          if isinstance(call, FunctionCall):
+            ident = call.expression
+            if isinstance(ident, Identifier):
+              if ident.name == 'ensures':
+                data.append(call.arguments)
+                continue
+        statements.append(stmt)
+      body = Block(statements)
+      if data:
+        ensures = partial(parse_ensures, data, parameters, returns)
+    return FunctionDefinition(name, parameters, returns, body, ensures)
 
   if node['nodeType'] == 'VariableDeclaration':
-    global name_counter
-    if not node['name']:
-      name = f'r{name_counter}'
-      name_counter += 1
-    else:
-      name = node['name']
+    name = node['name']
     type_name = parse(node['typeName'])
     return VariableDeclaration(name, type_name)
 
@@ -231,14 +426,11 @@ def parse(node):
   if node['nodeType'] == 'StructDefinition':
     name = node['name']
     members = [parse(x) for x in node['members']]
-    tmp = StructDefinition(name, members)
-    struct_definitions[name] = tmp
-    return tmp
+    return StructDefinition(name, members)
 
   if node['nodeType'] == 'UserDefinedTypeName':
     name = node['name']
-    referenced = struct_definitions[name]
-    return UserDefinedTypeName(name, referenced)
+    return UserDefinedTypeName(name)
 
   if node['nodeType'] == 'ArrayTypeName':
     base_type = parse(node['baseType'])
