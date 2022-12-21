@@ -154,7 +154,8 @@ def parse_with_tfm(node, tfm):
     parameters = [parse_with_tfm(x, tfm) for x in node['parameters']['parameters']]
     returns = [parse_with_tfm(x, tfm) for x in node['returnParameters']['parameters']]
     body = parse_with_tfm(node['body'], tfm) if node['body'] else None
-    return FunctionDefinition(name, parameters, returns, body)
+    func = FunctionDefinition(name, parameters, returns, body)
+    return tfm.compile_specification(func)
 
   if node['nodeType'] == 'VariableDeclaration':
     name = node['name']
@@ -216,11 +217,11 @@ def parse_with_tfm(node, tfm):
     arguments = [parse_with_tfm(x, tfm) for x in node['arguments']]
     
     # Attached loaded specification
-    payload = None
+    overridle = None
     if node['expression']['nodeType'] == 'Identifier':
       id_ = node['expression']['referencedDeclaration']
-      payload = tfm.exec_specification(id_, arguments)
-    return FunctionCall(kind, expression, arguments, payload)
+      overridle = tfm.load_specification(id_, arguments)
+    return FunctionCall(kind, expression, arguments, overridle)
 
   if node['nodeType'] == 'Mapping':
     key_type = parse_with_tfm(node['keyType'], tfm)
@@ -281,9 +282,9 @@ def parse_specification(node, tfm = None):
       parse_specification(x, tfm)
   elif node['nodeType'] == 'FunctionDefinition':
     func = parse_without_tfm(node)
-    tfm.visit_specification(node['id'], func)
+    tfm.link_specification(node['id'], func)
   else:
-    pass
+    return
 
 def parse(node, tfm = None):
   parse_specification(node, tfm)

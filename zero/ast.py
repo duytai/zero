@@ -66,7 +66,7 @@ class FunctionCall:
   kind: str
   expression: Any
   arguments: List[Any]
-  payload: Optional[Any] = None
+  overridle: Optional[Any] = None
   def __repr__(self):
     return f'{repr(self.expression)}({",".join([repr(x) for x in self.arguments])})'
 
@@ -97,6 +97,8 @@ class FunctionDefinition:
   parameters: List[VariableDeclaration]
   returns: List[VariableDeclaration]
   body: Optional[Any]
+  before: Any = None
+  after: Any = None
 
 @dataclass
 class Block:

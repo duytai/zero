@@ -41,16 +41,62 @@ class HoareTFM:
   def __init__(self):
     self.functions = {}
 
-  def exec_specification(self, _id, arguments):
+  def compile_specification(self, func):
+    pre_stmts = []
+    post_stmts = []
+    assert_stmts = []
+    if not func.body: return func
+    block = []
+    for statement in func.body.statements:
+      if isinstance(statement, ExpressionStatement):
+        call = statement.expression
+        if isinstance(call, FunctionCall):
+          ident = call.expression
+          if isinstance(ident, Identifier):
+            if ident.name == 'ensures':
+              alter = AlterOld()
+              pre, post = call.arguments
+              names = list(islice(gn.names(), 2))
+
+              pre_stmts.append(
+                VariableDeclarationStatement([
+                  VariableDeclaration(names[0], ElementaryTypeName('bool'))
+                ], alter.visit_expression(pre))
+              )
+              post_stmts.append(
+                VariableDeclarationStatement([
+                  VariableDeclaration(names[1], ElementaryTypeName('bool'))
+                ], alter.visit_expression(post))
+              )
+              assert_stmts.append(
+                ExpressionStatement(
+                  FunctionCall('functionCall', Identifier('assert'), [
+                    BinaryOperation(
+                      Identifier(names[0]),
+                      Identifier(names[1]),
+                      '=>'
+                    )
+                  ])
+                )
+              )
+              pre_stmts += alter.declarations
+              continue
+      block.append(statement)
+    func.body = Block(block)
+    func.pre = Block(pre_stmts)
+    func.post = Block(post_stmts + assert_stmts)
+    return func
+
+  def load_specification(self, _id, arguments):
     if _id in self.functions:
       return self.functions[_id](arguments)
     return None
 
-  def visit_specification(self, _id, func):
+  def link_specification(self, _id, func):
     if func.body:
-      self.functions[_id] = partial(self.__visit_specification__, func)
+      self.functions[_id] = partial(self.__link_specification__, func)
 
-  def __visit_specification__(self, func, arguments):
+  def __link_specification__(self, func, arguments):
     pre_stmts = []
     post_stmts = []
     mod_stmts = []
