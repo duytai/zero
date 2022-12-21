@@ -74,7 +74,7 @@ class FunctionCall:
   def __repr__(self):
     if self.overridle:
       ret, block = self.overridle
-      return f'////{repr(block)}//// {repr(ret)}'
+      return f'||{repr(block)}|| {repr(ret)}'
     return f'{repr(self.expression)}({",".join([repr(x) for x in self.arguments])})'
 
 @dataclass
@@ -111,13 +111,12 @@ class FunctionDefinition:
     returns = ', '.join([repr(x) for x in self.returns])
     body = ''
     if self.body:
-      statements = []
       if self.pre:
-        statements += self.pre.statements
-      statements += self.body.statements
+        body += f'||{repr(self.pre)}||\n'
+      body += repr(self.body) + '\n'
       if self.post:
-        statements += self.post.statements
-      body = '\n'.join([f'\t\t{x}' for x in repr(Block(statements)).split('\n')])
+        body += f'||{repr(self.post)}||'
+      body = '\n'.join([f'\t\t{x}' for x in body.split('\n')])
     if not body:
       return f'func {self.name}({parameters}) -> ({returns}) {{}}'
     return f'func {self.name}({parameters}) -> ({returns}):\n {body}'
