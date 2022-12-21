@@ -2,8 +2,6 @@ from z3 import *
 from .generator import *
 from copy import deepcopy
 
-MAX_UINT = Literal('number', str(2**256-1))
-
 def sort_for_type_name(type_name):
   if isinstance(type_name, ElementaryTypeName):
     if type_name.name.startswith('uint') or type_name.name == 'address':
@@ -123,6 +121,12 @@ class VariableRef:
     constraint = And([self.constraint, other.constraint])
     return VariableRef(type_name, val, constraint)
 
+  def __implies__(self, other):
+    type_name = ElementaryTypeName('bool')
+    val = Implies(self.val, other.val)
+    constraint = And([self.constraint, other.constraint])
+    return VariableRef(type_name, val, constraint)
+
   def __eq__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val == other.val
@@ -193,18 +197,10 @@ class VariableRef:
 
 @dataclass
 class StateRef:
-  variables: dict = field(default_factory=lambda : {})
-  conditions: Optional[VariableRef] = field(default=None)
+  variables: dict
+  conditions: Optional[VariableRef] = None
   runtime_reverts: Optional[VariableRef] = None
   arith_check: bool = True
-  prev_check_point: Optional[Any] = None
-
-  def save_check_point(self):
-    variables = deepcopy(self.variables)
-    conditions = deepcopy(self.conditions)
-    runtime_reverts = deepcopy(self.runtime_reverts)
-    arith_check = deepcopy(self.arith_check)
-    self.prev_check_point = StateRef(variables, conditions, runtime_reverts, arith_check)
 
   def mk_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
@@ -225,16 +221,10 @@ class StateRef:
     self.variables[name] = var
 
   def add_condition(self, condition):
-    if self.conditions is None:
-      self.conditions = condition
-    else:
-      self.conditions = self.conditions & condition
+    self.conditions = self.conditions & condition
 
   def add_runtime_revert(self, revert):
-    if self.runtime_reverts is None:
-      self.runtime_reverts = revert
-    else:
-      self.runtime_reverts = self.runtime_reverts | (self.conditions & revert)
+    self.runtime_reverts = self.runtime_reverts | (self.conditions & revert)
 
 def visit_assignment(exp, state):
   left = exp.left_hand_side
@@ -262,19 +252,10 @@ def visit_binary_operation(exp, state):
   left_expression = visit_expression(exp.left_expression, state)
   right_expression = visit_expression(exp.right_expression, state)
   if exp.operator == '+':
-    if state.arith_check:
-      state.add_runtime_revert(left_expression + right_expression > visit_expression(MAX_UINT, state))
-      state.add_condition(left_expression + right_expression <= visit_expression(MAX_UINT, state))
     return left_expression + right_expression
   if exp.operator == '-':
-    if state.arith_check:
-      state.add_runtime_revert(left_expression < right_expression)
-      state.add_condition(left_expression >= right_expression)
     return left_expression - right_expression
   if exp.operator == '*':
-    if state.arith_check:
-      state.add_runtime_revert(left_expression * right_expression > visit_expression(MAX_UINT, state))
-      state.add_condition(left_expression * right_expression <= visit_expression(MAX_UINT, state))
     return left_expression * right_expression
   if exp.operator == '>':
     return left_expression > right_expression
@@ -292,6 +273,8 @@ def visit_binary_operation(exp, state):
     return left_expression | right_expression
   if exp.operator == '&&':
     return left_expression & right_expression
+  if exp.operator == '=>':
+    return left_expression.__implies__(right_expression)
   raise ValueError(exp.operator)
 
 def visit_unary_operation(exp, state):
@@ -328,21 +311,18 @@ def visit_function_call(exp, state):
       return visit_expression(exp.arguments[0], state)
   if exp.kind == 'functionCall':
     if isinstance(exp.expression, Identifier):
-      if exp.expression.name.startswith('old_'):
-        return visit_expression(exp.arguments[0], state.prev_check_point)
-      if exp.expression.name == 'over_uint':
-        return visit_expression(exp.arguments[0], state) > visit_literal(MAX_UINT, state)
       if exp.expression.name == 'require':
         condition = visit_expression(exp.arguments[0], state)
         state.add_runtime_revert(condition.__not__())
         state.add_condition(condition)
         return
       if exp.expression.name == 'assert':
-        assertion = visit_expression(exp.arguments[0], state)
-        pre = And([state.conditions.constraint, state.conditions.val, assertion.constraint])
-        post = assertion.val
+        arg = visit_expression(exp.arguments[0], state)
+        pre = And([state.conditions.constraint, state.conditions.val, arg.constraint])
+        assertion = Implies(pre, arg.val)
         solver = Solver()
-        solver.add(Not(Implies(pre, post)))
+        solver.add(Not(assertion))
+        print(assertion)
         print(solver.check())
         return
   raise ValueError(exp)
@@ -379,7 +359,11 @@ def visit_expression(exp, state):
 
 def validate(root):
   for resources, parameters, returns, path in generate_execution_paths(root):
-    state = StateRef()
+    state = StateRef(
+      {},
+      VariableRef(ElementaryTypeName('bool'), BoolVal(True), BoolVal(True)),
+      VariableRef(ElementaryTypeName('bool'), BoolVal(False), BoolVal(True))
+    )
     # state variables
     Msg = UserDefinedTypeName('Msg', StructDefinition('Msg', [
       VariableDeclaration('sender', ElementaryTypeName('address')),
@@ -393,23 +377,9 @@ def validate(root):
     # returns
     for var in returns:
       state.mk_default_const(var.name, var.type_name)
-    state.save_check_point()
-
     # start validating every execution paths
-    ensures = []
-    reverts = []
-
     for statement in path:
       if isinstance(statement, ExpressionStatement):
-        if isinstance(statement.expression, FunctionCall):
-          call = statement.expression
-          if isinstance(call.expression, Identifier):
-            if call.expression.name == 'reverts_if':
-              reverts += call.arguments
-              continue
-            if call.expression.name == 'ensures':
-              ensures.append(tuple(call.arguments))
-              continue
         visit_expression(statement.expression, state)
       elif isinstance(statement, VariableDeclarationStatement):
         declarations = []
@@ -428,26 +398,3 @@ def validate(root):
       else:
         condition = visit_expression(statement, state)
         state.add_condition(condition)
-
-    # It is time to validate
-    print('> reverts')
-    for e in reverts:
-      revert = visit_expression(e, state.prev_check_point)
-      assertion = Implies(
-        And([revert.val, revert.constraint, state.runtime_reverts.constraint]),
-        state.runtime_reverts.val
-      )
-      solver = Solver()
-      solver.add(Not(assertion))
-      print(solver.check())
-
-    # It is time for ensures
-    print('> ensures')
-    for pre, post in ensures:
-      pre = visit_expression(pre, state.prev_check_point)
-      post = visit_expression(post, state)
-      assertion = Implies(And([pre.val, pre.constraint]), post.val)
-      solver = Solver()
-      solver.add(Not(assertion))
-      print(solver.check())
-

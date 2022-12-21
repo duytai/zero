@@ -72,4 +72,8 @@ def generate_execution_paths(root):
         if isinstance(part, FunctionDefinition):
           if part.body:
             for path in compute_execution_paths(part.body):
+              if part.pre:
+                path = part.pre.statements + path
+              if part.post:
+                path += part.post.statements
               yield resources, part.parameters, part.returns, path

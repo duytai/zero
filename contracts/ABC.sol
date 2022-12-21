@@ -10,9 +10,11 @@ contract TestSuite {
 
 contract ABC is TestSuite {
     mapping(address => uint256) balances;
+    uint counter = 0;
     function test(uint k) public returns(uint z) {
-        ensures(k > 0, z == 80 + old_uint(z));
-        z = add(10, 20) + add(20, 30);
+        ensures(k > 0, counter == old_uint(counter) + k);
+        ensures(k < 0, counter == old_uint(counter) + 100 - 100);
+        counter = counter + k;
     }
     function add(uint x, uint y) public returns(uint z) {
         ensures(true, z == x + y);
