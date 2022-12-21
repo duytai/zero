@@ -89,7 +89,7 @@ class HoareTFM:
 
   def load_specification(self, _id, arguments):
     if _id in self.functions:
-      return self.functions[_id](arguments)
+      return self.functions[_id](arguments[::])
     return None
 
   def link_specification(self, _id, func):
@@ -172,5 +172,5 @@ class HoareTFM:
         raise ValueError(stmt)
       block.append(stmt)
     # Construct return value
-    return TupleExpression(returns), block
+    return TupleExpression(returns), Block(block)
 

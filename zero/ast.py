@@ -11,6 +11,8 @@ class ElementaryTypeName:
 class Mapping:
   key_type: Any
   value_type: Any
+  def __repr__(self):
+    return f'({repr(self.key_type)}=>{repr(self.value_type)})'
 
 @dataclass
 class UserDefinedTypeName:
@@ -47,6 +49,8 @@ class Assignment:
   left_hand_side: Any
   right_hand_side: Any
   operator: str
+  def __repr__(self):
+    return f'{repr(self.left_hand_side)} {self.operator} {repr(self.right_hand_side)}'
 
 @dataclass
 class Identifier:
@@ -68,6 +72,9 @@ class FunctionCall:
   arguments: List[Any]
   overridle: Optional[Any] = None
   def __repr__(self):
+    if self.overridle:
+      ret, block = self.overridle
+      return f'////{repr(block)}//// {repr(ret)}'
     return f'{repr(self.expression)}({",".join([repr(x) for x in self.arguments])})'
 
 @dataclass
@@ -99,6 +106,21 @@ class FunctionDefinition:
   body: Optional[Any]
   before: Any = None
   after: Any = None
+  def __repr__(self):
+    parameters = ', '.join([repr(x) for x in self.parameters])
+    returns = ', '.join([repr(x) for x in self.returns])
+    body = ''
+    if self.body:
+      statements = []
+      if self.pre:
+        statements += self.pre.statements
+      statements += self.body.statements
+      if self.post:
+        statements += self.post.statements
+      body = '\n'.join([f'\t\t{x}' for x in repr(Block(statements)).split('\n')])
+    if not body:
+      return f'func {self.name}({parameters}) -> ({returns}) {{}}'
+    return f'func {self.name}({parameters}) -> ({returns}):\n {body}'
 
 @dataclass
 class Block:
@@ -110,7 +132,7 @@ class Block:
 class ExpressionStatement:
   expression: Any
   def __repr__(self):
-    return repr(self.expression)
+    return f'{repr(self.expression)};'
 
 @dataclass
 class VariableDeclarationStatement:
@@ -119,7 +141,7 @@ class VariableDeclarationStatement:
   def __repr__(self):
     right = repr(self.initial_value) if self.initial_value else '?'
     left = ','.join([repr(x) for x in self.declarations])
-    return f'{left} := {right}'
+    return f'{left} = {right};'
 
 @dataclass
 class ForStatement:
@@ -137,11 +159,16 @@ class IfStatement:
 @dataclass
 class Return:
   expression: Optional[Any]
+  def __repr__(self):
+    return f'return {repr(self.expression)}' if self.expression else 'return'
 
 @dataclass
 class ContractDefinition:
   name: str
   nodes: List[Any]
+  def __repr__(self):
+    body = '\n'.join([f'\t{repr(x)}' for x in self.nodes])
+    return f'contract {self.name}: \n{body}'
 
 @dataclass
 class StructDefinition:
@@ -151,6 +178,8 @@ class StructDefinition:
 @dataclass
 class SourceUnit:
   nodes: List[Any]
+  def __repr__(self):
+    return '\n'.join([repr(x) for x in self.nodes])
 
 @dataclass
 class Nothing: pass
