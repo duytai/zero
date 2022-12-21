@@ -306,6 +306,24 @@ def visit_literal(exp, _):
   raise ValueError(exp.kind)
 
 def visit_function_call(exp, state):
+  if exp.overridle:
+    ret, block = exp.overridle
+    for statement in block.statements:
+      if isinstance(statement, ExpressionStatement):
+        visit_expression(statement.expression, state)
+      elif isinstance(statement, VariableDeclarationStatement):
+        declarations = []
+        for var in statement.declarations:
+          state.mk_default_const(var.name, var.type_name)
+          declarations.append(var.name)
+        if statement.initial_value:
+          init = visit_expression(statement.initial_value, state)
+          for name, val in zip(declarations, init if is_array(init) else [init]):
+            state.store_const(name, val)
+      else:
+        raise ValueError(statement)
+    return visit_expression(ret, state)
+
   if exp.kind == 'typeConversion':
     if isinstance(exp.expression, ElementaryTypeNameExpression):
       return visit_expression(exp.arguments[0], state)
@@ -314,6 +332,10 @@ def visit_function_call(exp, state):
       if exp.expression.name == 'require':
         condition = visit_expression(exp.arguments[0], state)
         state.add_runtime_revert(condition.__not__())
+        state.add_condition(condition)
+        return
+      if exp.expression.name == 'assume':
+        condition = visit_expression(exp.arguments[0], state)
         state.add_condition(condition)
         return
       if exp.expression.name == 'assert':
@@ -336,6 +358,11 @@ def visit_member_access(exp, state):
   expression = visit_expression(exp.expression, state)
   return getattr(expression, exp.member_name)
 
+def visit_anything(exp, state):
+  name = FreshConst(IntSort()).sexpr()
+  state.mk_const(name, exp.type_name)
+  return state.fetch_const(name)
+
 def visit_expression(exp, state):
   if isinstance(exp, Assignment):
     return visit_assignment(exp, state)
@@ -355,6 +382,8 @@ def visit_expression(exp, state):
     return visit_index_access(exp, state)
   if isinstance(exp, MemberAccess):
     return visit_member_access(exp, state)
+  if isinstance(exp, Anything):
+    return visit_anything(exp, state)
   raise ValueError(exp)
 
 def validate(root):

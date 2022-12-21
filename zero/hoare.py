@@ -22,9 +22,14 @@ class AlterOld(ExpVisitor):
         )
         self.modifies.append(
           ExpressionStatement(
-            FunctionCall('functionCall', Identifier('modifies'), exp.arguments)
+            Assignment(exp.arguments[0], Anything(ElementaryTypeName('uint')), '=')
           )
         )
+        # self.modifies.append(
+        #   ExpressionStatement(
+        #     FunctionCall('functionCall', Identifier('modifies'), exp.arguments)
+        #   )
+        # )
         return Identifier(names[0])
     return exp
 

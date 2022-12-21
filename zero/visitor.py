@@ -55,6 +55,12 @@ class ExpVisitor:
   def visit_elementary_type_name_expression(self, exp):
     return ElementaryTypeNameExpression(exp.name)
 
+  def visit_anything(self, exp):
+    return Anything(exp.type_name)
+
+  def visit_nothing(self, exp):
+    return Nothing()
+
   def visit_expression(self, exp):
     if isinstance(exp, BinaryOperation):
       return self.visit_binary_operation(exp)
@@ -76,4 +82,8 @@ class ExpVisitor:
       return self.visit_member_access(exp)
     if isinstance(exp, ElementaryTypeNameExpression):
       return self.visit_elementary_type_name_expression(exp)
+    if isinstance(exp, Anything):
+      return self.visit_anything(exp)
+    if isinstance(exp, Nothing):
+      return self.visit_nothing(exp)
     raise ValueError(exp)
