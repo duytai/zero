@@ -66,6 +66,7 @@ class FunctionCall:
   kind: str
   expression: Any
   arguments: List[Any]
+  payload: Optional[Any] = None
   def __repr__(self):
     return f'{repr(self.expression)}({",".join([repr(x) for x in self.arguments])})'
 

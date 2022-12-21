@@ -215,12 +215,12 @@ def parse_with_tfm(node, tfm):
     expression = parse_with_tfm(node['expression'], tfm)
     arguments = [parse_with_tfm(x, tfm) for x in node['arguments']]
     
-    # Replace function call with appropriate specifications
+    # Attached loaded specification
+    payload = None
     if node['expression']['nodeType'] == 'Identifier':
       id_ = node['expression']['referencedDeclaration']
-      val = tfm.exec_specification(id_, arguments)
-      if val: return val
-    return FunctionCall(kind, expression, arguments)
+      payload = tfm.exec_specification(id_, arguments)
+    return FunctionCall(kind, expression, arguments, payload)
 
   if node['nodeType'] == 'Mapping':
     key_type = parse_with_tfm(node['keyType'], tfm)

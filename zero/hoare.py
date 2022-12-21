@@ -40,13 +40,10 @@ class AlterIdent(ExpVisitor):
 class HoareTFM:
   def __init__(self):
     self.functions = {}
-    self.statements = []
 
   def exec_specification(self, _id, arguments):
     if _id in self.functions:
-      val, block = self.functions[_id](arguments)
-      self.statements += block
-      return val
+      return self.functions[_id](arguments)
     return None
 
   def visit_specification(self, _id, func):
