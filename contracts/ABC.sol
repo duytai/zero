@@ -10,27 +10,12 @@ contract TestSuite {
 
 contract ABC is TestSuite {
     mapping(address => uint256) balances;
-    uint counter = 0;
-    uint c = 0;
-    function test(uint k) public returns(uint z) {
-        ensures(counter == 1, counter == 2 && c == k + 1);
-        c = add(k, 1);
-        // ensures(k >= 20, counter == old_uint(counter) + k);
-        // ensures(k < 20, counter == old_uint(counter) - k);
-        // if (k >= 20) {
-        //     counter = add(counter, k);
-        // } else {
-        //     counter = sub(counter, k);
-        // }
+    uint totalSupply;
+
+    function test() public {
+        ensures(true, true);
+        balances[msg.sender] = 10;
+        totalSupply = 10;
     }
-    function add(uint x, uint y) public returns(uint z) {
-        ensures(true, z == x + y);
-        // ensures(true, counter == old_uint(counter) + 1);
-        counter = counter + 1;
-        return x + y;
-    }
-    function sub(uint x, uint y) public returns(uint z) {
-        ensures(true, z == x - y);
-        return x - y;
-    }
+
 }

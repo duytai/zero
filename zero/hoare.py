@@ -25,11 +25,6 @@ class AlterOld(ExpVisitor):
             Assignment(exp.arguments[0], Anything(ElementaryTypeName('uint')), '=')
           )
         )
-        # self.modifies.append(
-        #   ExpressionStatement(
-        #     FunctionCall('functionCall', Identifier('modifies'), exp.arguments)
-        #   )
-        # )
         return Identifier(names[0])
     return exp
 
@@ -84,7 +79,7 @@ class HoareTFM:
                   ])
                 )
               )
-              pre_stmts += alter.declarations
+              pre_stmts = alter.declarations + pre_stmts
               continue
       block.append(statement)
     func.body = Block(block)
