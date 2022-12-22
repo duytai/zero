@@ -11,6 +11,10 @@ def unroll_loop_statements(statement):
     )
   elif isinstance(statement, ForStatement):
     num_unrolled = 2
+    ## Heuristic to unroll
+    if isinstance(statement.condition, BinaryOperation):
+      if isinstance(statement.condition.right_expression, Literal):
+        num_unrolled = int(statement.condition.right_expression.value)
     return Block([
       statement.init,
       Block(num_unrolled * [

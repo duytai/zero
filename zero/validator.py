@@ -53,7 +53,7 @@ def constraint_for_type_name(value, type_name):
     key = FreshConst(IntSort())
     constraint = ForAll(key, constraint_for_type_name(value[key], type_name.base_type))
     if type_name.length:
-      return And([key <= IntVal(type_name.length), key >= 0, constraint])
+      return And([key < IntVal(int(type_name.length.value)), key >= 0, constraint])
     return And([key >= 0, constraint])
   raise ValueError((value, type_name))
 
@@ -65,6 +65,12 @@ def default_for_type_name(value, type_name):
       return value == BoolVal(False)
     if type_name.name == 'address':
       return value == 0
+  if isinstance(type_name, ArrayTypeName):
+    key = FreshConst(IntSort())
+    constraint = ForAll(key, default_for_type_name(value[key], type_name.base_type))
+    if type_name.length:
+      return And([key < IntVal(int(type_name.length.value)), key >= 0, constraint])
+    return And([key >= 0, constraint])
   raise ValueError((value, type_name))
 
 @dataclass
@@ -74,16 +80,6 @@ class VariableRef:
   constraint: Any = BoolVal(True)
 
   def __post_init__(self):
-    if isinstance(self.type_name, ArrayTypeName):
-      type_name = ElementaryTypeName('uint')
-      name = f'{self.val.sexpr()}.length'
-      val = Const(name, IntSort())
-      constraint = constraint_for_type_name(val, type_name)
-      if self.type_name.length:
-        constraint = And([constraint, val < self.type_name.length])
-      tmp = VariableRef(type_name, val, constraint)
-      setattr(self, 'length', tmp)
-
     if isinstance(self.type_name, UserDefinedTypeName):
       if isinstance(self.type_name.referenced, StructDefinition):
         for idx, var in enumerate(self.type_name.referenced.members):
@@ -226,6 +222,27 @@ class VariableRef:
       ])
       return VariableRef(type_name, val, constraint)
 
+  def __getattr__(self, key):
+    if isinstance(self.type_name, ElementaryTypeName):
+      if self.type_name.name == 'address':
+        # @B hold of mapping from address => balance
+        type_name = Mapping(ElementaryTypeName('address'), ElementaryTypeName('uint'))
+        sort = sort_for_type_name(type_name)
+        val = Const('@B', sort)
+        constraint = constraint_for_type_name(val, type_name)
+        tmp = VariableRef(type_name, val, constraint)
+        return tmp[self]
+    if isinstance(self.type_name, ArrayTypeName):
+      # return the length of array
+      type_name = ElementaryTypeName('uint')
+      name = f'{self.val.sexpr()}.length'
+      val = Const(name, IntSort())
+      constraint = constraint_for_type_name(val, type_name)
+      if self.type_name.length:
+        constraint = And([constraint, val < int(self.type_name.length.value)])
+      return VariableRef(type_name, val, constraint)
+    raise ValueError(key)
+
 @dataclass
 class StateRef:
   variables: dict
@@ -318,6 +335,10 @@ def visit_unary_operation(exp, state):
     return sub_expression.__not__()
   if exp.operator == '++':
     assignment = Assignment(exp.sub_expression, Literal('number', '1'), '+=')
+    visit_assignment(assignment, state)
+    return visit_expression(exp.sub_expression, state)
+  if exp.operator == '--':
+    assignment = Assignment(exp.sub_expression, Literal('number', '1'), '-=')
     visit_assignment(assignment, state)
     return visit_expression(exp.sub_expression, state)
   raise ValueError(exp.operator)
@@ -473,6 +494,7 @@ def validate(root):
     ]))
     msg = VariableDeclaration('msg', Msg)
     state.mk_const(msg.name, msg.type_name)
+    state.mk_const('this', ElementaryTypeName('address'))
     # global variables and parameters
     for var in resources + parameters:
       state.mk_const(var.name, var.type_name)

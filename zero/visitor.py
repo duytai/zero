@@ -118,7 +118,7 @@ class StmtVisitor:
     if isinstance(statement, VariableDeclarationStatement):
       return self.visit_variable_declaration_statement(statement)
     if isinstance(statement, ForStatement):
-      return self.visit_return(statement)
+      return self.visit_for_statement(statement)
     if isinstance(statement, IfStatement):
       return self.visit_if_statement(statement)
     if isinstance(statement, Return):
@@ -128,7 +128,7 @@ class StmtVisitor:
     raise ValueError(statement)
 
   def visit_return(self, statement):
-    return Return(statement.expression)
+    return Return(statement.expression if statement.expression else None)
 
   def visit_expression_statement(self, statement):
     return ExpressionStatement(statement.expression)

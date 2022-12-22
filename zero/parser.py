@@ -1,7 +1,8 @@
 from .ast import *
 
 
-global_variables_by_contracts = {}
+global_variables_by_contract = {}
+global_interfaces_by_id = {}
 
 """
 Parse ast without modification
@@ -111,7 +112,7 @@ def parse_without_tfm(node):
 
   if node['nodeType'] == 'ArrayTypeName':
     base_type = parse_without_tfm(node['baseType'])
-    length = int(node['length']) if node['length'] else None
+    length = parse_without_tfm(node['length']) if node['length'] else None
     return ArrayTypeName(base_type, length)
 
   if node['nodeType'] == 'VariableDeclarationStatement':
@@ -163,7 +164,7 @@ def parse_with_tfm(node, tfm):
     parents = node['linearizedBaseContracts'][1:]
     extra = []
     for cid in parents:
-      extra += global_variables_by_contracts[cid]
+      extra += global_variables_by_contract[cid]
     # ->>> Load variables from parent contracts
     name = node['name']
     nodes  = [parse_with_tfm(x, tfm) for x in node['nodes'] + extra]
@@ -287,7 +288,7 @@ def parse_with_tfm(node, tfm):
 
   if node['nodeType'] == 'ArrayTypeName':
     base_type = parse_with_tfm(node['baseType'], tfm)
-    length = int(node['length']) if node['length'] else None
+    length = parse_with_tfm(node['length'], tfm) if node['length'] else None
     return ArrayTypeName(base_type, length)
 
   if node['nodeType'] == 'VariableDeclarationStatement':
@@ -329,10 +330,10 @@ def parse_specification(node, tfm = None):
       parse_specification(x, tfm)
   elif node['nodeType'] == 'ContractDefinition':
     cid = node['id']
-    global_variables_by_contracts[cid] = []
+    global_variables_by_contract[cid] = []
     for x in node['nodes']:
       if x['nodeType'] == 'VariableDeclaration':
-        global_variables_by_contracts[cid].append(x)
+        global_variables_by_contract[cid].append(x)
       parse_specification(x, tfm)
   elif node['nodeType'] == 'FunctionDefinition':
     func = parse_without_tfm(node)
