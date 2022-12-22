@@ -1,6 +1,6 @@
 from .ast import *
 from .registry import gn
-from .visitor import ExpVisitor
+from .visitor import ExpVisitor, StmtVisitor
 from itertools import islice
 from functools import partial
 
@@ -9,10 +9,15 @@ class AlterMany(ExpVisitor):
   def __init__(self):
     self.declarations = []
     self.modifies = []
+    self.sum_uint = set()
 
   def visit_function_call(self, exp):
     ident = exp.expression
     if isinstance(ident, Identifier):
+      if ident.name == 'sum_uint':
+        name = f'sum_{exp.arguments[0].name}'
+        self.sum_uint.add(exp.arguments[0].name)
+        return Identifier(name)
       if ident.name == 'old_uint':
         names = list(islice(gn.names(), 1))
         self.declarations.append(
@@ -20,9 +25,10 @@ class AlterMany(ExpVisitor):
             VariableDeclaration(names[0], ElementaryTypeName('uint')),
           ], self.visit_expression(exp.arguments[0]))
         )
+        e = self.visit_expression(exp.arguments[0])
         self.modifies.append(
           ExpressionStatement(
-            Assignment(exp.arguments[0], Anything(ElementaryTypeName('uint')), '=')
+            Assignment(e, Anything(ElementaryTypeName('uint')), '=')
           )
         )
         return Identifier(names[0])
@@ -37,6 +43,41 @@ class AlterIdent(ExpVisitor):
       return Identifier(self.data[exp.name])
     return exp
 
+class InjectSum(StmtVisitor):
+  def __init__(self, data):
+    self.data = list(data)
+
+  def visit_expression_statement(self, statement):
+    if isinstance(statement.expression, Assignment):
+      assignment = statement.expression
+      left_hand_side = assignment.left_hand_side
+      if isinstance(left_hand_side, IndexAccess):
+        ident = left_hand_side.base_expression
+        if isinstance(ident, Identifier):
+          if ident.name in self.data:
+            tmp = next(gn.names())
+            before = VariableDeclarationStatement(
+              [VariableDeclaration(tmp, ElementaryTypeName('uint'))],
+              left_hand_side,
+            )
+            after = ExpressionStatement(
+              Assignment(
+                Identifier(f'sum_{ident.name}'),
+                BinaryOperation(
+                  BinaryOperation(
+                    Identifier(f'sum_{ident.name}'),
+                    left_hand_side,
+                    '+'
+                  ),
+                  Identifier(tmp),
+                  '-'
+                ),
+                '='
+              )
+            )
+            return Block([before, statement, after])
+    return statement
+
 class HoareTFM:
   def __init__(self):
     self.functions = {}
@@ -45,6 +86,7 @@ class HoareTFM:
     pre_stmts = []
     post_stmts = []
     assert_stmts = []
+    sum_uint = set()
     if not func.body: return func
     block = []
     for statement in func.body.statements:
@@ -54,6 +96,7 @@ class HoareTFM:
           ident = call.expression
           if isinstance(ident, Identifier):
             if ident.name in ['achieves_ok', 'achieves_err']: continue
+            if ident.name == 'reverts_if': continue
             if ident.name == 'ensures':
               alter = AlterMany()
               pre, post = call.arguments
@@ -81,11 +124,13 @@ class HoareTFM:
                 )
               )
               pre_stmts = alter.declarations + pre_stmts
+              sum_uint = sum_uint.union(alter.sum_uint)
               continue
       block.append(statement)
-    func.body = Block(block)
+    func.body = InjectSum(sum_uint).visit_statement(Block(block))
     func.pre = Block(pre_stmts)
     func.post = Block(post_stmts + assert_stmts)
+    
     return func
 
   def load_specification(self, _id, arguments):

@@ -9,6 +9,8 @@ def sort_for_type_name(type_name):
       return IntSort()
     if type_name.name == 'bool':
       return BoolSort()
+    if type_name.name == 'string':
+      return StringSort()
   if isinstance(type_name, Mapping):
     key_sort = sort_for_type_name(type_name.key_type)
     value_sort = sort_for_type_name(type_name.value_type)
@@ -27,8 +29,14 @@ def sort_for_type_name(type_name):
 
 def constraint_for_type_name(value, type_name):
   if isinstance(type_name, ElementaryTypeName):
-    if type_name.name.startswith('uint') or type_name.name == 'address':
+    if type_name.name.startswith('uint'):
       return value >= 0
+    if type_name.name == 'address':
+      return value >= 0
+    if type_name.name == 'bool':
+      return BoolVal(True)
+    if type_name.name == 'string':
+      return BoolVal(True)
   if isinstance(type_name, Mapping):
     key_sort = sort_for_type_name(type_name.key_type)
     key = FreshConst(key_sort)
@@ -55,6 +63,8 @@ def default_for_type_name(value, type_name):
       return value == 0
     if type_name.name == 'bool':
       return value == BoolVal(False)
+    if type_name.name == 'address':
+      return value == 0
   raise ValueError((value, type_name))
 
 @dataclass
@@ -345,7 +355,7 @@ def visit_function_call(exp, state):
     if isinstance(exp.expression, Identifier):
       if exp.expression.name == 'require':
         condition = visit_expression(exp.arguments[0], state)
-        state.add_runtime_revert(condition.__not__())
+        # state.add_runtime_revert(condition.__not__())
         state.add_condition(condition)
         return
       if exp.expression.name == 'assume':
@@ -399,6 +409,9 @@ def visit_anything(exp, state):
   state.mk_const(name, exp.type_name)
   return state.fetch_const(name)
 
+def visit_nothing(exp, state):
+  return FreshConst(BoolSort())
+
 def visit_expression(exp, state):
   if isinstance(exp, Assignment):
     return visit_assignment(exp, state)
@@ -420,6 +433,10 @@ def visit_expression(exp, state):
     return visit_member_access(exp, state)
   if isinstance(exp, Anything):
     return visit_anything(exp, state)
+  if isinstance(exp, Nothing):
+    return visit_nothing(exp, state)
+  if isinstance(exp, EmitStatement):
+    return None
   raise ValueError(exp)
 
 def validate(root):
@@ -460,6 +477,8 @@ def validate(root):
           init = visit_expression(statement.expression, state)
           for r, val in zip(returns, init if is_array(init) else [init]):
             state.store_const(r.name, val)
+      elif isinstance(statement, EmitStatement):
+        pass
       else:
         condition = visit_expression(statement, state)
         state.add_condition(condition)

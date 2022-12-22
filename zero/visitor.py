@@ -87,3 +87,55 @@ class ExpVisitor:
     if isinstance(exp, Nothing):
       return self.visit_nothing(exp)
     raise ValueError(exp)
+
+class StmtVisitor:
+  def visit_block(self, statement):
+    return Block([self.visit_statement(x) for x in statement.statements])
+
+  def visit_for_statement(self, statement):
+    return ForStatement(
+      self.visit_statement(statement.init),
+      statement.condition,
+      self.visit_statement(statement.loop),
+      self.visit_statement(statement.body)
+    )
+
+  def visit_if_statement(self, statement):
+    return IfStatement(
+      statement.condition,
+      self.visit_statement(statement.true_body),
+      self.visit_statement(statement.false_body) if statement.false_body else None
+    )
+
+  def visit_emit_statement(self, statement):
+    return EmitStatement()
+
+  def visit_statement(self, statement):
+    if isinstance(statement, Block):
+      return self.visit_block(statement)
+    if isinstance(statement, ExpressionStatement):
+      return self.visit_expression_statement(statement)
+    if isinstance(statement, VariableDeclarationStatement):
+      return self.visit_variable_declaration_statement(statement)
+    if isinstance(statement, ForStatement):
+      return self.visit_return(statement)
+    if isinstance(statement, IfStatement):
+      return self.visit_if_statement(statement)
+    if isinstance(statement, Return):
+      return self.visit_return(statement)
+    if isinstance(statement, EmitStatement):
+      return self.visit_emit_statement(statement)
+    raise ValueError(statement)
+
+  def visit_return(self, statement):
+    return Return(statement.expression)
+
+  def visit_expression_statement(self, statement):
+    return ExpressionStatement(statement.expression)
+
+  def visit_variable_declaration_statement(self, statement):
+    return VariableDeclarationStatement(
+      statement.declarations,
+      statement.initial_value
+    )
+

@@ -134,6 +134,15 @@ def parse_without_tfm(node):
   if node['nodeType'] == 'UsingForDirective':
     return UsingForDirective()
 
+  if node['nodeType'] == 'EmitStatement':
+    return EmitStatement()
+
+  if node['nodeType'] == 'EventDefinition':
+    return EventDefinition()
+
+  if node['nodeType'] == 'ModifierDefinition':
+    return ModifierDefinition()
+
   raise ValueError(node['nodeType'])
 
 
@@ -151,7 +160,19 @@ def parse_with_tfm(node, tfm):
   if node['nodeType'] == 'ContractDefinition':
     name = node['name']
     nodes  = [parse_with_tfm(x, tfm) for x in node['nodes']]
-    return ContractDefinition(name, nodes)
+    extra = []
+    for x in nodes:
+      if isinstance(x, VariableDeclaration):
+        if isinstance(x.type_name, Mapping):
+          if isinstance(x.type_name.value_type, ElementaryTypeName):
+            if x.type_name.value_type.name.startswith('uint'):
+              extra.append(
+                VariableDeclaration(
+                  f'sum_{x.name}',
+                  x.type_name.value_type,
+                )
+              )
+    return ContractDefinition(name, extra + nodes)
 
   if node['nodeType'] == 'FunctionDefinition':
     name = node['name']
@@ -283,6 +304,15 @@ def parse_with_tfm(node, tfm):
 
   if node['nodeType'] == 'UsingForDirective':
     return UsingForDirective()
+
+  if node['nodeType'] == 'EmitStatement':
+    return EmitStatement()
+
+  if node['nodeType'] == 'EventDefinition':
+    return EventDefinition()
+
+  if node['nodeType'] == 'ModifierDefinition':
+    return ModifierDefinition()
 
   raise ValueError(node['nodeType'])
 
