@@ -479,7 +479,7 @@ def visit_expression(exp):
     return None
   raise ValueError(exp)
 
-def visit_statement(statement, returns):
+def visit_statement(statement, returns=None):
   if isinstance(statement, ExpressionStatement):
     visit_expression(statement.expression)
   elif isinstance(statement, VariableDeclarationStatement):
@@ -562,9 +562,79 @@ def sol_assert(arguments):
     print(colored(f'    assert({arg.val})', 'yellow'))
   return FreshConst(BoolSort())
 
+# solidity assume function
+def sol_assume(arguments):
+  arg = visit_expression(arguments[0])
+  state.add_condition(arg)
+
 # solidity address cast function
 def sol_address(arguments):
   return visit_expression(arguments[0])
+
+def sol_func(function, arguments):
+  statements = []
+  returns = []
+  data = {}
+  for x in function.returns:
+    name = next(gn.names())
+    statements.append(
+      VariableDeclarationStatement([
+        VariableDeclaration(name, x.type_name)
+      ], Anything(x.type_name))
+    )
+    returns.append(Identifier(name))
+  for var, value in zip(function.parameters + function.returns, arguments + returns):
+    name = next(gn.names())
+    statements.append(
+      VariableDeclarationStatement([
+        VariableDeclaration(name, var.type_name)
+      ], value)
+    )
+    data[var.name] = name
+  # Replace idents
+  @dataclass
+  class B(ExpVisitor):
+    def __init__(self, data):
+      self.data = data
+    def visit_identifier(self, exp):
+      if exp.name in self.data:
+        return Identifier(self.data[exp.name])
+      return exp
+  b = B(data)
+  # Search ensures
+  for statement in function.body.statements:
+    if isinstance(statement, ExpressionStatement):
+      if isinstance(statement.expression, FunctionCall):
+        call = statement.expression
+        if isinstance(call.expression, Identifier):
+          ident = call.expression
+          if ident.name == 'ensures':
+            pre, post = call.arguments
+            names = list(islice(gn.names(), 2))
+            statements.append(
+              VariableDeclarationStatement([
+                VariableDeclaration(names[0], ElementaryTypeName('bool'))
+              ], b.visit_expression(pre))
+            )
+            statements.append(
+              VariableDeclarationStatement([
+                VariableDeclaration(names[1], ElementaryTypeName('bool'))
+              ], b.visit_expression(post))
+            )
+            statements.append(
+              ExpressionStatement(
+                FunctionCall('functionCall', Identifier('assume'), [
+                  BinaryOperation(
+                    Identifier(names[0]),
+                    Identifier(names[1]),
+                    '=>'
+                  )
+                ])
+              )
+            )
+  for x in statements:
+    visit_statement(x)
+  return visit_expression(TupleExpression(returns))
 
 def validate(root):
   global search
@@ -573,22 +643,26 @@ def validate(root):
   # validate
   for variables, functions, func, path in generate_execution_paths(root):
     state.init()
-    # state functions
+    # visible functions
+    for function in functions:
+      state.store_const(function.name, partial(sol_func, function))
+    # State functions
     state.store_const('assert', partial(sol_assert))
     state.store_const('ensures', partial(sol_ensures))
     state.store_const('address', partial(sol_address))
-    # state variables
+    state.store_const('assume', partial(sol_assume))
+    # State variables
     Msg = UserDefinedTypeName('struct Msg')
     msg = VariableDeclaration('msg', Msg)
     state.mk_const(msg.name, msg.type_name)
     state.mk_const('this', ElementaryTypeName('address'))
-    # global variables and parameters
+    # Global variables and parameters
     for var in variables + func.parameters:
       state.mk_const(var.name, var.type_name)
-    # returns
+    # Returns
     for var in func.returns:
       state.mk_default_const(var.name, var.type_name)
-    # start validating every execution paths
+    # Start validating every execution paths
     for statement in path:
       visit_statement(statement, func.returns)
       while before_all:
