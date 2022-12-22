@@ -20,7 +20,8 @@ def parse_without_tfm(node):
     parameters = [parse_without_tfm(x) for x in node['parameters']['parameters']]
     returns = [parse_without_tfm(x) for x in node['returnParameters']['parameters']]
     body = parse_without_tfm(node['body']) if node['body'] else None
-    return FunctionDefinition(name, parameters, returns, body)
+    visibility = node['visibility']
+    return FunctionDefinition(name, parameters, returns, body, visibility)
 
   if node['nodeType'] == 'VariableDeclaration':
     name = node['name']
@@ -130,6 +131,9 @@ def parse_without_tfm(node):
   if node['nodeType'] == 'ElementaryTypeNameExpression':
     return ElementaryTypeNameExpression(node['typeName'])
 
+  if node['nodeType'] == 'UsingForDirective':
+    return UsingForDirective()
+
   raise ValueError(node['nodeType'])
 
 
@@ -154,7 +158,8 @@ def parse_with_tfm(node, tfm):
     parameters = [parse_with_tfm(x, tfm) for x in node['parameters']['parameters']]
     returns = [parse_with_tfm(x, tfm) for x in node['returnParameters']['parameters']]
     body = parse_with_tfm(node['body'], tfm) if node['body'] else None
-    func = FunctionDefinition(name, parameters, returns, body)
+    visibility = node['visibility']
+    func = FunctionDefinition(name, parameters, returns, body, visibility)
     return tfm.compile_specification(func)
 
   if node['nodeType'] == 'VariableDeclaration':
@@ -218,8 +223,13 @@ def parse_with_tfm(node, tfm):
     
     # Attached loaded specification
     overridle = None
+    # Internal funciton call
     if node['expression']['nodeType'] == 'Identifier':
       id_ = node['expression']['referencedDeclaration']
+      overridle = tfm.load_specification(id_, arguments)
+    if node['expression']['nodeType'] == 'MemberAccess':
+      id_ = node['expression']['referencedDeclaration']
+      arguments = [parse_with_tfm(node['expression']['expression'], tfm)] + arguments
       overridle = tfm.load_specification(id_, arguments)
     return FunctionCall(kind, expression, arguments, overridle)
 
@@ -270,6 +280,9 @@ def parse_with_tfm(node, tfm):
 
   if node['nodeType'] == 'ElementaryTypeNameExpression':
     return ElementaryTypeNameExpression(node['typeName'])
+
+  if node['nodeType'] == 'UsingForDirective':
+    return UsingForDirective()
 
   raise ValueError(node['nodeType'])
 

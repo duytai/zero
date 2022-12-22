@@ -67,11 +67,12 @@ def compute_execution_paths(statement):
 def generate_execution_paths(root):
   for contract in root.nodes:
     if isinstance(contract, ContractDefinition):
+      print(f'contract {contract.name}')
       resources = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
       for part in contract.nodes:
         if isinstance(part, FunctionDefinition):
-          if part.body:
-            print(f'>> Verifying {part.name}')
+          if part.body and part.body.statements:
+            print(f'  func {part.name}')
             for path in compute_execution_paths(part.body):
               if part.pre:
                 path = part.pre.statements + path

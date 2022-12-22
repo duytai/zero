@@ -1,6 +1,7 @@
 from z3 import *
 from .generator import *
 from copy import deepcopy
+from termcolor import colored
 
 def sort_for_type_name(type_name):
   if isinstance(type_name, ElementaryTypeName):
@@ -165,6 +166,16 @@ class VariableRef:
     ])
     return VariableRef(type_name, val, constraint)
 
+  def __truediv__(self, other):
+    type_name = self.type_name
+    val = self.val / other.val
+    constraint = And([
+      constraint_for_type_name(val, type_name),
+      self.constraint,
+      other.constraint
+    ])
+    return VariableRef(type_name, val, constraint)
+
   def __sub__(self, other):
     type_name = self.type_name
     val = self.val - other.val
@@ -257,6 +268,8 @@ def visit_binary_operation(exp, state):
     return left_expression - right_expression
   if exp.operator == '*':
     return left_expression * right_expression
+  if exp.operator == '/':
+    return left_expression / right_expression
   if exp.operator == '>':
     return left_expression > right_expression
   if exp.operator == '<':
@@ -345,17 +358,30 @@ def visit_function_call(exp, state):
         assertion = Implies(pre, arg.val)
         solver = Solver()
         solver.add(Not(assertion))
-        print(assertion)
-        print(solver.check())
+        if solver.check() == unsat:
+          print(colored(f'    assert({arg.val})', 'green'))
+        else:
+          print(colored(f'    assert({arg.val})', 'yellow'))
         return
       if exp.expression.name == 'ok':
         arg = visit_expression(exp.arguments[0], state)
         assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
-        # assertion = Implies(pre, arg.val)
         solver = Solver()
         solver.add(assertion)
-        print(assertion)
-        print(solver.check())
+        if solver.check() == sat:
+          print(colored(f'    ok({arg.val})', 'green'))
+        else:
+          print(colored(f'    ok({arg.val})', 'yellow'))
+        return
+      if exp.expression.name == 'err':
+        arg = visit_expression(exp.arguments[0], state)
+        assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
+        solver = Solver()
+        solver.add(assertion)
+        if solver.check() == sat:
+          print(colored(f'    err({arg.val})', 'green'))
+        else:
+          print(colored(f'    err({arg.val})', 'yellow'))
         return
   raise ValueError(exp)
 

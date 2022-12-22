@@ -53,7 +53,7 @@ class HoareTFM:
         if isinstance(call, FunctionCall):
           ident = call.expression
           if isinstance(ident, Identifier):
-            if ident.name == 'achieves_ok': continue
+            if ident.name in ['achieves_ok', 'achieves_err']: continue
             if ident.name == 'ensures':
               alter = AlterMany()
               pre, post = call.arguments

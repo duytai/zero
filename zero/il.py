@@ -54,7 +54,8 @@ class ILTFM:
           ident = call.expression
           if isinstance(ident, Identifier):
             if ident.name == 'ensures': continue
-            if ident.name == 'achieves_ok':
+            if ident.name == 'achieves_ok' or ident.name == 'achieves_err':
+              func_assert = Identifier(ident.name.split('_')[1])
               alter = AlterMany()
               pre, post = call.arguments
               names = list(islice(gn.names(), 2))
@@ -71,7 +72,7 @@ class ILTFM:
               )
               assert_stmts.append(
                 ExpressionStatement(
-                  FunctionCall('functionCall', Identifier('ok'), [
+                  FunctionCall('functionCall', func_assert, [
                     BinaryOperation(
                       Identifier(names[0]),
                       Identifier(names[1]),
