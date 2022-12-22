@@ -7,5 +7,5 @@ if __name__ == '__main__':
     tfm = HoareTFM()
     # tfm = ILTFM()
     root = parse(json.loads(root), tfm)
-    print(root)
+    # print(root)
     validate(root)

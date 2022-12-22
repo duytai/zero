@@ -1,6 +1,8 @@
 from .ast import *
 
 
+global_variables_by_contracts = {}
+
 """
 Parse ast without modification
 """
@@ -158,8 +160,13 @@ def parse_with_tfm(node, tfm):
     return SourceUnit(nodes)
 
   if node['nodeType'] == 'ContractDefinition':
+    parents = node['linearizedBaseContracts'][1:]
+    extra = []
+    for cid in parents:
+      extra += global_variables_by_contracts[cid]
+    # ->>> Load variables from parent contracts
     name = node['name']
-    nodes  = [parse_with_tfm(x, tfm) for x in node['nodes']]
+    nodes  = [parse_with_tfm(x, tfm) for x in node['nodes'] + extra]
     extra = []
     for x in nodes:
       if isinstance(x, VariableDeclaration):
@@ -321,7 +328,11 @@ def parse_specification(node, tfm = None):
     for x in node['nodes']:
       parse_specification(x, tfm)
   elif node['nodeType'] == 'ContractDefinition':
+    cid = node['id']
+    global_variables_by_contracts[cid] = []
     for x in node['nodes']:
+      if x['nodeType'] == 'VariableDeclaration':
+        global_variables_by_contracts[cid].append(x)
       parse_specification(x, tfm)
   elif node['nodeType'] == 'FunctionDefinition':
     func = parse_without_tfm(node)

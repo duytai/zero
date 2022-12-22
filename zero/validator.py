@@ -186,6 +186,16 @@ class VariableRef:
     ])
     return VariableRef(type_name, val, constraint)
 
+  def __mod__(self, other):
+    type_name = self.type_name
+    val = self.val % other.val
+    constraint = And([
+      constraint_for_type_name(val, type_name),
+      self.constraint,
+      other.constraint
+    ])
+    return VariableRef(type_name, val, constraint) 
+
   def __sub__(self, other):
     type_name = self.type_name
     val = self.val - other.val
@@ -298,6 +308,8 @@ def visit_binary_operation(exp, state):
     return left_expression & right_expression
   if exp.operator == '=>':
     return left_expression.__implies__(right_expression)
+  if exp.operator == '%':
+    return left_expression % right_expression
   raise ValueError(exp.operator)
 
 def visit_unary_operation(exp, state):
@@ -323,8 +335,12 @@ def visit_literal(exp, _):
     value = BoolVal(exp.value == 'true')
     return VariableRef(type_name, value)
   if exp.kind == 'number':
+    if exp.value.startswith('0x'):
+      int_val = int(exp.value, 16)
+    else:
+      int_val = int(exp.value)
     type_name = ElementaryTypeName('uint')
-    value = IntVal(int(exp.value))
+    value = IntVal(int_val)
     return VariableRef(type_name, value)
   raise ValueError(exp.kind)
 
@@ -353,6 +369,10 @@ def visit_function_call(exp, state):
 
   if exp.kind == 'functionCall':
     if isinstance(exp.expression, Identifier):
+      if exp.expression.name == 'revert':
+        condition = VariableRef(ElementaryTypeName('bool'), BoolVal(False), BoolVal(True))
+        state.add_condition(condition)
+        return
       if exp.expression.name == 'require':
         condition = visit_expression(exp.arguments[0], state)
         # state.add_runtime_revert(condition.__not__())

@@ -62,7 +62,17 @@ def compute_visited_paths(statement):
 def compute_execution_paths(statement):
   statement = unroll_loop_statements(statement)
   for visited in compute_visited_paths(statement):
-    yield list(construct_execution_path(statement, visited))
+    # Execution path stops at revert and return
+    path = []
+    for v in construct_execution_path(statement, visited):
+      path.append(v)
+      if isinstance(v, Return): break
+      if isinstance(v, ExpressionStatement):
+        if isinstance(v.expression, FunctionCall):
+          ident = v.expression.expression
+          if isinstance(ident, Identifier):
+            if ident.name == 'revert': break
+    yield path
 
 def generate_execution_paths(root):
   for contract in root.nodes:
