@@ -104,11 +104,14 @@ def parse_without_tfm(node):
   if node['nodeType'] == 'StructDefinition':
     name = node['name']
     members = [parse_without_tfm(x) for x in node['members']]
-    return StructDefinition(name, members)
+    tmp = StructDefinition(name, members)
+    global_interfaces_by_id[node['id']] = StructDefinition
+    return tmp
 
   if node['nodeType'] == 'UserDefinedTypeName':
     name = node['name']
-    return UserDefinedTypeName(name)
+    referenced = global_interfaces_by_id.get(node['referencedDeclaration'])
+    return UserDefinedTypeName(name, referenced)
 
   if node['nodeType'] == 'ArrayTypeName':
     base_type = parse_without_tfm(node['baseType'])
@@ -280,11 +283,14 @@ def parse_with_tfm(node, tfm):
   if node['nodeType'] == 'StructDefinition':
     name = node['name']
     members = [parse_with_tfm(x, tfm) for x in node['members']]
-    return StructDefinition(name, members)
+    tmp = StructDefinition(name, members)
+    global_interfaces_by_id[node['id']] = tmp
+    return tmp
 
   if node['nodeType'] == 'UserDefinedTypeName':
     name = node['name']
-    return UserDefinedTypeName(name)
+    referenced = global_interfaces_by_id.get(node['referencedDeclaration'])
+    return UserDefinedTypeName(name, referenced)
 
   if node['nodeType'] == 'ArrayTypeName':
     base_type = parse_with_tfm(node['baseType'], tfm)

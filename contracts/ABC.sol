@@ -10,6 +10,11 @@ contract TestSuite {
 
 
 contract ABC is TestSuite {
+  struct Hello {
+    uint a;
+    uint b;
+  }
+  Hello hello;
   function add(uint x, uint y) private returns(uint z) {
     ensures(true, z == x + y);
     return x + y;
@@ -17,9 +22,9 @@ contract ABC is TestSuite {
 
   function test() public payable returns(uint z) {
     uint[] memory lst;
-    ensures(true, z == 80);
+    // ensures(true, z == 80);
     uint k = address(this).balance;
-    // ok(k >= lst.length);
+    assert(k >= lst.length + hello.a);
     // for (uint i = 0; i < 2; i += 1) {
     //   z += add(20, 20);
     // }

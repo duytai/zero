@@ -79,19 +79,6 @@ class VariableRef:
   val: Any
   constraint: Any = BoolVal(True)
 
-  def __post_init__(self):
-    if isinstance(self.type_name, UserDefinedTypeName):
-      if isinstance(self.type_name.referenced, StructDefinition):
-        for idx, var in enumerate(self.type_name.referenced.members):
-          type_name = var.type_name
-          val = self.val.sort().accessor(0, idx)(self.val)
-          constraint = And([
-            self.constraint,
-            constraint_for_type_name(val, type_name)
-          ])
-          tmp = VariableRef(type_name, val, constraint)
-          setattr(self, var.name, tmp)
-
   def __lt__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val < other.val
@@ -223,6 +210,19 @@ class VariableRef:
       return VariableRef(type_name, val, constraint)
 
   def __getattr__(self, key):
+    
+    if isinstance(self.type_name, UserDefinedTypeName):
+      if isinstance(self.type_name.referenced, StructDefinition):
+        for idx, var in enumerate(self.type_name.referenced.members):
+          if var.name == key:
+            type_name = var.type_name
+            val = self.val.sort().accessor(0, idx)(self.val)
+            constraint = And([
+              self.constraint,
+              constraint_for_type_name(val, type_name)
+            ])
+            return VariableRef(type_name, val, constraint)
+
     if isinstance(self.type_name, ElementaryTypeName):
       if self.type_name.name == 'address':
         # @B hold of mapping from address => balance
@@ -232,6 +232,7 @@ class VariableRef:
         constraint = constraint_for_type_name(val, type_name)
         tmp = VariableRef(type_name, val, constraint)
         return tmp[self]
+
     if isinstance(self.type_name, ArrayTypeName):
       # return the length of array
       type_name = ElementaryTypeName('uint')
@@ -241,6 +242,7 @@ class VariableRef:
       if self.type_name.length:
         constraint = And([constraint, val < int(self.type_name.length.value)])
       return VariableRef(type_name, val, constraint)
+
     raise ValueError(key)
 
 @dataclass
