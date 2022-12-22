@@ -9,19 +9,23 @@ contract TestSuite {
 }
 
 library SafeMath {
+  function ensures(bool, bool) internal pure {}
   function add(uint x, uint y) internal pure returns(uint z) {
+    ensures(true, z == x + y);
     return x + y;
   }
 }
 
-contract ABC {
-  using SafeMath for uint;
+contract ABC is TestSuite {
+  // using SafeMath for uint;
   struct Hello {
     uint a;
     uint b;
   }
   Hello hello;
+  uint c;
   function test() public payable returns(uint z) {
+    ensures(true, z == 89 + old_uint(c));
     uint m = 100;
     m++;
     m--;
@@ -29,6 +33,8 @@ contract ABC {
     uint[10][20] memory lst;
     lst[0][0] = 10;
     assert(lst[0][0] == 10 + hello.a);
+    c = 987;
     z = 1000;
+    assert(z == m + c);
   }
 }

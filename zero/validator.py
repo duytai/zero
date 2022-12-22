@@ -1,12 +1,17 @@
 from z3 import *
 from .generator import *
+from .visitor import *
 from copy import deepcopy
 from termcolor import colored
 from dataclasses import field
 from functools import partial
+from itertools import islice
 
 state = None
 search = None
+gn = None
+before_all = []
+after_all = []
 
 def sort_for_type_name(type_name):
   if isinstance(type_name, ElementaryTypeName):
@@ -79,6 +84,17 @@ def default_for_type_name(value, type_name):
       return And([key < IntVal(int(type_name.length.value)), key >= 0, constraint])
     return And([key >= 0, constraint])
   raise ValueError((value, type_name))
+
+@dataclass
+class GlobalName:
+  counter: int = 0
+
+  def names(self):
+    while True:
+      self.counter += 1
+      yield f't!{self.counter}'
+
+gn = GlobalName()
 
 @dataclass
 class VariableRef:
@@ -199,7 +215,6 @@ class VariableRef:
     return VariableRef(None, type_name, val, constraint)
 
   def __lshift__(self, other):
-    # NOTE: this is shorthand for assignment, not leftshift
     if self.top:
       left, prop = self.top
       if isinstance(left.type_name, ArrayTypeName):
@@ -294,7 +309,9 @@ class StateRef:
     self.variables[name] = VariableRef(name, type_name, value, constraint)
 
   def fetch_const(self, name):
-    return self.variables[name]
+    var = self.variables[name]
+    var.name = name
+    return var
 
   def store_const(self, name, var):
     var.name = name
@@ -401,57 +418,8 @@ def visit_literal(exp):
   raise ValueError(exp.kind)
 
 def visit_function_call(exp):
-
-  if exp.kind == 'typeConversion':
-    if isinstance(exp.expression, ElementaryTypeNameExpression):
-      return visit_expression(exp.arguments[0])
-
-  if exp.kind == 'functionCall':
-    if isinstance(exp.expression, Identifier):
-      if exp.expression.name == 'revert':
-        condition = VariableRef(None, ElementaryTypeName('bool'), BoolVal(False), BoolVal(True))
-        state.add_condition(condition)
-        return
-      if exp.expression.name == 'require':
-        condition = visit_expression(exp.arguments[0])
-        state.add_condition(condition)
-        return
-      if exp.expression.name == 'assume':
-        condition = visit_expression(exp.arguments[0])
-        state.add_condition(condition)
-        return
-      if exp.expression.name == 'assert':
-        arg = visit_expression(exp.arguments[0])
-        pre = And([state.conditions.constraint, state.conditions.val, arg.constraint])
-        assertion = Implies(pre, arg.val)
-        solver = Solver()
-        solver.add(Not(assertion))
-        if solver.check() == unsat:
-          print(colored(f'    assert({arg.val})', 'green'))
-        else:
-          print(colored(f'    assert({arg.val})', 'yellow'))
-        return
-      if exp.expression.name == 'ok':
-        arg = visit_expression(exp.arguments[0])
-        assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
-        solver = Solver()
-        solver.add(assertion)
-        if solver.check() == sat:
-          print(colored(f'    ok({arg.val})', 'green'))
-        else:
-          print(colored(f'    ok({arg.val})', 'yellow'))
-        return
-      if exp.expression.name == 'err':
-        arg = visit_expression(exp.arguments[0])
-        assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
-        solver = Solver()
-        solver.add(assertion)
-        if solver.check() == sat:
-          print(colored(f'    err({arg.val})', 'green'))
-        else:
-          print(colored(f'    err({arg.val})', 'yellow'))
-        return
-  raise ValueError(exp)
+  func = visit_expression(exp.expression)
+  return func(exp.arguments)
 
 def visit_index_access(exp):
   index_expression = visit_expression(exp.index_expression)
@@ -501,11 +469,99 @@ def visit_expression(exp):
     return None
   raise ValueError(exp)
 
+def visit_statement(statement, returns):
+  if isinstance(statement, ExpressionStatement):
+    visit_expression(statement.expression)
+  elif isinstance(statement, VariableDeclarationStatement):
+    declarations = []
+    for var in statement.declarations:
+      state.mk_default_const(var.name, var.type_name)
+      declarations.append(var.name)
+    if statement.initial_value:
+      init = visit_expression(statement.initial_value)
+      for name, val in zip(declarations, init if is_array(init) else [init]):
+        state.store_const(name, val)
+  elif isinstance(statement, Return):
+    if statement.expression:
+      init = visit_expression(statement.expression)
+      for r, val in zip(returns, init if is_array(init) else [init]):
+        state.store_const(r.name, val)
+  elif isinstance(statement, EmitStatement):
+    pass
+  else:
+    condition = visit_expression(statement)
+    state.add_condition(condition)
+
+# solidity ensures functions
+def sol_ensures(arguments):
+  pre, post = arguments
+  names = list(islice(gn.names(), 2))
+  # Add to before all
+  stmt = VariableDeclarationStatement([
+    VariableDeclaration(names[0], ElementaryTypeName('bool'))
+  ], pre)
+  before_all.append(stmt)
+  # Search for old_uint
+  @dataclass
+  class A(ExpVisitor):
+    statements = []
+    def visit_function_call(self, node):
+      if isinstance(node.expression, Identifier):
+        if node.expression.name == 'old_uint':
+          name = next(gn.names())
+          stmt = VariableDeclarationStatement([
+            VariableDeclaration(name, ElementaryTypeName('uint'))
+          ], self.visit_expression(node.arguments[0]))
+          self.statements.append(stmt)
+          return Identifier(name)
+      return node
+  a = A()
+  post = a.visit_expression(post)
+  before_all.extend(a.statements)
+  # Add to after all
+  stmt = VariableDeclarationStatement([
+    VariableDeclaration(names[1], ElementaryTypeName('bool'))
+  ], post)
+  after_all.append(stmt)
+  stmt = ExpressionStatement(
+    FunctionCall(
+      'functionCall',
+      Identifier('assert'),
+      [
+        BinaryOperation(
+          Identifier(names[0]),
+          Identifier(names[1]),
+          '=>'
+        )
+      ]
+    )
+  )
+  after_all.append(stmt)
+  return FreshConst(BoolSort())
+
+# solidity assert functions
+def sol_assert(arguments):
+  arg = visit_expression(arguments[0])
+  pre = And([state.conditions.constraint, state.conditions.val, arg.constraint])
+  assertion = Implies(pre, arg.val)
+  solver = Solver()
+  solver.add(Not(assertion))
+  if solver.check() == unsat:
+    print(colored(f'    assert({arg.val})', 'green'))
+  else:
+    print(colored(f'    assert({arg.val})', 'yellow'))
+  return FreshConst(BoolSort())
+
 def validate(root):
   global search
   search = partial(type_search, root)
+
+  # validate
   for resources, parameters, returns, path in generate_execution_paths(root):
     state.init()
+    # state functions
+    state.store_const('assert', partial(sol_assert))
+    state.store_const('ensures', partial(sol_ensures))
     # state variables
     Msg = UserDefinedTypeName('struct Msg')
     msg = VariableDeclaration('msg', Msg)
@@ -519,24 +575,8 @@ def validate(root):
       state.mk_default_const(var.name, var.type_name)
     # start validating every execution paths
     for statement in path:
-      if isinstance(statement, ExpressionStatement):
-        visit_expression(statement.expression)
-      elif isinstance(statement, VariableDeclarationStatement):
-        declarations = []
-        for var in statement.declarations:
-          state.mk_default_const(var.name, var.type_name)
-          declarations.append(var.name)
-        if statement.initial_value:
-          init = visit_expression(statement.initial_value)
-          for name, val in zip(declarations, init if is_array(init) else [init]):
-            state.store_const(name, val)
-      elif isinstance(statement, Return):
-        if statement.expression:
-          init = visit_expression(statement.expression)
-          for r, val in zip(returns, init if is_array(init) else [init]):
-            state.store_const(r.name, val)
-      elif isinstance(statement, EmitStatement):
-        pass
-      else:
-        condition = visit_expression(statement)
-        state.add_condition(condition)
+      visit_statement(statement, returns)
+      while before_all:
+        visit_statement(before_all.pop(0), returns)
+    while after_all:
+      visit_statement(after_all.pop(0), returns)
