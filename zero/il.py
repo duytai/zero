@@ -37,7 +37,7 @@ class AlterIdent(ExpVisitor):
       return Identifier(self.data[exp.name])
     return exp
 
-class HoareTFM:
+class ILTFM:
   def __init__(self):
     self.functions = {}
 
@@ -53,8 +53,8 @@ class HoareTFM:
         if isinstance(call, FunctionCall):
           ident = call.expression
           if isinstance(ident, Identifier):
-            if ident.name == 'achieves_ok': continue
-            if ident.name == 'ensures':
+            if ident.name == 'ensures': continue
+            if ident.name == 'achieves_ok':
               alter = AlterMany()
               pre, post = call.arguments
               names = list(islice(gn.names(), 2))
@@ -71,11 +71,11 @@ class HoareTFM:
               )
               assert_stmts.append(
                 ExpressionStatement(
-                  FunctionCall('functionCall', Identifier('assert'), [
+                  FunctionCall('functionCall', Identifier('ok'), [
                     BinaryOperation(
                       Identifier(names[0]),
                       Identifier(names[1]),
-                      '=>'
+                      '&&'
                     )
                   ])
                 )
@@ -109,7 +109,7 @@ class HoareTFM:
         if isinstance(call, FunctionCall):
           ident = call.expression
           if isinstance(ident, Identifier):
-            if ident.name == 'ensures':
+            if ident.name == 'achieves_ok':
               alter = AlterMany()
               pre, post = call.arguments
               names = list(islice(gn.names(), 2))
@@ -130,7 +130,7 @@ class HoareTFM:
                     BinaryOperation(
                       Identifier(names[0]),
                       Identifier(names[1]),
-                      '=>'
+                      '&&'
                     )
                   ])
                 )

@@ -327,6 +327,7 @@ def visit_function_call(exp, state):
   if exp.kind == 'typeConversion':
     if isinstance(exp.expression, ElementaryTypeNameExpression):
       return visit_expression(exp.arguments[0], state)
+
   if exp.kind == 'functionCall':
     if isinstance(exp.expression, Identifier):
       if exp.expression.name == 'require':
@@ -344,6 +345,15 @@ def visit_function_call(exp, state):
         assertion = Implies(pre, arg.val)
         solver = Solver()
         solver.add(Not(assertion))
+        print(assertion)
+        print(solver.check())
+        return
+      if exp.expression.name == 'ok':
+        arg = visit_expression(exp.arguments[0], state)
+        assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
+        # assertion = Implies(pre, arg.val)
+        solver = Solver()
+        solver.add(assertion)
         print(assertion)
         print(solver.check())
         return

@@ -71,6 +71,7 @@ def generate_execution_paths(root):
       for part in contract.nodes:
         if isinstance(part, FunctionDefinition):
           if part.body:
+            print(f'>> Verifying {part.name}')
             for path in compute_execution_paths(part.body):
               if part.pre:
                 path = part.pre.statements + path
