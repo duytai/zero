@@ -290,6 +290,7 @@ class StateRef:
     return self.variables[name]
 
   def store_const(self, name, var):
+    var.name = name
     self.variables[name] = var
 
   def add_condition(self, condition):
@@ -359,12 +360,14 @@ def visit_unary_operation(exp):
   if exp.operator == '!':
     return sub_expression.__not__()
   if exp.operator == '++':
-    assignment = Assignment(exp.sub_expression, Literal('number', '1'), '+=')
-    visit_assignment(assignment)
+    sub_expression = visit_expression(exp.sub_expression)
+    right = visit_expression(Literal('number', '1'))
+    sub_expression << (sub_expression + right)
     return visit_expression(exp.sub_expression)
   if exp.operator == '--':
-    assignment = Assignment(exp.sub_expression, Literal('number', '1'), '-=')
-    visit_assignment(assignment)
+    sub_expression = visit_expression(exp.sub_expression)
+    right = visit_expression(Literal('number', '1'))
+    sub_expression << (sub_expression - right)
     return visit_expression(exp.sub_expression)
   raise ValueError(exp.operator)
 
@@ -421,7 +424,6 @@ def visit_function_call(exp):
         return
       if exp.expression.name == 'require':
         condition = visit_expression(exp.arguments[0])
-        # state.add_runtime_revert(condition.__not__())
         state.add_condition(condition)
         return
       if exp.expression.name == 'assume':
