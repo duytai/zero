@@ -24,14 +24,19 @@ contract ABC is TestSuite {
   }
   Hello hello;
   uint c;
+  uint counter;
   function add(uint x, uint y) public returns(uint z) {
-    ensures(y < 10, z == x + y);
+    ensures(true, z == x + y);
+    ensures(true, counter == old_uint(counter) + 1);
+    counter += 1;
     return x + y;
   }
   function test() public payable returns(uint m) {
     // assert(hello.ax >= 0);
+    counter = 20;
     uint k = add(m, 30);
     assert(k == m + 30);
+    assert(counter == 21);
     // assert(address(this).balance >= 0);
     // ensures(true, z == 89 + old_uint(c));
     // uint m = 100;

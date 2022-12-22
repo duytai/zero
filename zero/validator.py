@@ -347,6 +347,10 @@ state = StateRef({})
 def visit_assignment(exp):
   left = visit_expression(exp.left_hand_side)
   right = visit_expression(exp.right_hand_side)
+  if exp.operator == '+=':
+    right = left + right
+  if exp.operator == '-=':
+    right = left - right
   left << right
 
 def visit_binary_operation(exp):
@@ -594,13 +598,23 @@ def sol_func(function, arguments):
   # Replace idents
   @dataclass
   class B(ExpVisitor):
+    statements = []
     def __init__(self, data):
       self.data = data
     def visit_identifier(self, exp):
       if exp.name in self.data:
         return Identifier(self.data[exp.name])
       return exp
-  b = B(data)
+    def visit_function_call(self, node):
+      if isinstance(node.expression, Identifier):
+        if node.expression.name == 'old_uint':
+          ident = self.visit_expression(node.arguments[0])
+          stmt = ExpressionStatement(
+            Assignment(ident, Anything(ElementaryTypeName('uint')), '=')
+          )
+          self.statements.append(stmt)
+          return ident
+      return node
   # Search ensures
   for statement in function.body.statements:
     if isinstance(statement, ExpressionStatement):
@@ -609,6 +623,7 @@ def sol_func(function, arguments):
         if isinstance(call.expression, Identifier):
           ident = call.expression
           if ident.name == 'ensures':
+            b = B(data)
             pre, post = call.arguments
             names = list(islice(gn.names(), 2))
             statements.append(
@@ -616,10 +631,12 @@ def sol_func(function, arguments):
                 VariableDeclaration(names[0], ElementaryTypeName('bool'))
               ], b.visit_expression(pre))
             )
+            pp = b.visit_expression(post)
+            statements.extend(b.statements)
             statements.append(
               VariableDeclarationStatement([
                 VariableDeclaration(names[1], ElementaryTypeName('bool'))
-              ], b.visit_expression(post))
+              ], pp)
             )
             statements.append(
               ExpressionStatement(
