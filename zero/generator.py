@@ -82,10 +82,11 @@ def generate_execution_paths(root):
   for contract in root.nodes:
     if isinstance(contract, ContractDefinition):
       print(f'contract {contract.name}')
-      resources = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
-      for part in contract.nodes:
-        if isinstance(part, FunctionDefinition):
-          if part.body and part.body.statements:
-            print(f'  func {part.name}')
-            for path in compute_execution_paths(part.body):
-              yield resources, part.parameters, part.returns, path
+      variables = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
+      functions = [x for x in contract.nodes if isinstance(x, FunctionDefinition)]
+      for func in contract.nodes:
+        if isinstance(func, FunctionDefinition):
+          if func.body and func.body.statements:
+            print(f'  func {func.name}')
+            for path in compute_execution_paths(func.body):
+              yield variables, functions, func, path

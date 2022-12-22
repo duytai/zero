@@ -269,13 +269,16 @@ class VariableRef:
 
     if isinstance(self.type_name, ElementaryTypeName):
       if self.type_name.name == 'address':
-        # @B hold of mapping from address => balance
-        type_name = Mapping(ElementaryTypeName('address'), ElementaryTypeName('uint'))
-        sort = sort_for_type_name(type_name)
-        val = Const('@B', sort)
-        constraint = constraint_for_type_name(val, type_name)
-        tmp = VariableRef(None, type_name, val, constraint)
-        return tmp[self]
+        if key == 'balance':
+          # @B hold of mapping from address => balance
+          type_name = Mapping(ElementaryTypeName('address'), ElementaryTypeName('uint'))
+          sort = sort_for_type_name(type_name)
+          val = Const('@B', sort)
+          constraint = constraint_for_type_name(val, type_name)
+          tmp = VariableRef(None, type_name, val, constraint)
+          return tmp[self]
+      if self.type_name.name == 'uint':
+        raise ValueError(key)
 
     if isinstance(self.type_name, ArrayTypeName):
       # return the length of array
@@ -284,7 +287,7 @@ class VariableRef:
       val = Const(name, IntSort())
       constraint = constraint_for_type_name(val, type_name)
       if self.type_name.length:
-        constraint = And([constraint, val < int(self.type_name.length.value)])
+        constraint = And([constraint, val == int(self.type_name.length.value)])
       return VariableRef(None, type_name, val, constraint)
 
     raise ValueError(key)
@@ -442,6 +445,11 @@ def visit_anything(exp):
 def visit_nothing(exp):
   return FreshConst(BoolSort())
 
+def visit_elementary_type_name_expression(exp):
+  if exp.name == 'address':
+    return state.fetch_const('address')
+  raise ValueError(exp)
+
 def visit_expression(exp):
   if isinstance(exp, Assignment):
     return visit_assignment(exp)
@@ -465,6 +473,8 @@ def visit_expression(exp):
     return visit_anything(exp)
   if isinstance(exp, Nothing):
     return visit_nothing(exp)
+  if isinstance(exp, ElementaryTypeNameExpression):
+    return visit_elementary_type_name_expression(exp)
   if isinstance(exp, EmitStatement):
     return None
   raise ValueError(exp)
@@ -552,31 +562,36 @@ def sol_assert(arguments):
     print(colored(f'    assert({arg.val})', 'yellow'))
   return FreshConst(BoolSort())
 
+# solidity address cast function
+def sol_address(arguments):
+  return visit_expression(arguments[0])
+
 def validate(root):
   global search
   search = partial(type_search, root)
 
   # validate
-  for resources, parameters, returns, path in generate_execution_paths(root):
+  for variables, functions, func, path in generate_execution_paths(root):
     state.init()
     # state functions
     state.store_const('assert', partial(sol_assert))
     state.store_const('ensures', partial(sol_ensures))
+    state.store_const('address', partial(sol_address))
     # state variables
     Msg = UserDefinedTypeName('struct Msg')
     msg = VariableDeclaration('msg', Msg)
     state.mk_const(msg.name, msg.type_name)
     state.mk_const('this', ElementaryTypeName('address'))
     # global variables and parameters
-    for var in resources + parameters:
+    for var in variables + func.parameters:
       state.mk_const(var.name, var.type_name)
     # returns
-    for var in returns:
+    for var in func.returns:
       state.mk_default_const(var.name, var.type_name)
     # start validating every execution paths
     for statement in path:
-      visit_statement(statement, returns)
+      visit_statement(statement, func.returns)
       while before_all:
-        visit_statement(before_all.pop(0), returns)
+        visit_statement(before_all.pop(0), func.returns)
     while after_all:
-      visit_statement(after_all.pop(0), returns)
+      visit_statement(after_all.pop(0), func.returns)
