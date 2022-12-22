@@ -21,12 +21,9 @@ contract ABC is TestSuite {
   }
 
   function test() public payable returns(uint z) {
-    uint[] memory lst;
-    // ensures(true, z == 80);
-    uint k = address(this).balance;
-    assert(k >= lst.length + hello.a);
-    // for (uint i = 0; i < 2; i += 1) {
-    //   z += add(20, 20);
-    // }
+    uint[10][20] memory lst;
+    lst[0][0] = 10;
+    assert(lst[0][0] == 10);
+    // z = 1000;
   }
 }

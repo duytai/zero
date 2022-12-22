@@ -2,6 +2,7 @@ from z3 import *
 from .generator import *
 from copy import deepcopy
 from termcolor import colored
+from dataclasses import field
 
 def sort_for_type_name(type_name):
   if isinstance(type_name, ElementaryTypeName):
@@ -75,69 +76,71 @@ def default_for_type_name(value, type_name):
 
 @dataclass
 class VariableRef:
+  name: str
   type_name: Any
   val: Any
   constraint: Any = BoolVal(True)
+  top: Any = None
 
   def __lt__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val < other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __le__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val <= other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __gt__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val > other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __ge__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val >= other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __or__(self, other):
     type_name = ElementaryTypeName('bool')
     val = Or([self.val, other.val])
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __and__(self, other):
     type_name = ElementaryTypeName('bool')
     val = And([self.val, other.val])
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __implies__(self, other):
     type_name = ElementaryTypeName('bool')
     val = Implies(self.val, other.val)
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __eq__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val == other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __ne__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val != other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __not__(self):
     type_name = ElementaryTypeName('bool')
     val = Not(self.val)
     constraint = self.constraint
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __add__(self, other):
     type_name = self.type_name
@@ -147,7 +150,7 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __mul__(self, other):
     type_name = self.type_name
@@ -157,7 +160,7 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __truediv__(self, other):
     type_name = self.type_name
@@ -167,7 +170,7 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
 
   def __mod__(self, other):
     type_name = self.type_name
@@ -177,7 +180,7 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint) 
+    return VariableRef(None, type_name, val, constraint) 
 
   def __sub__(self, other):
     type_name = self.type_name
@@ -187,7 +190,27 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(None, type_name, val, constraint)
+
+  def __lshift__(self, other):
+    # NOTE: this is shorthand for assignment, not leftshift
+    if self.top:
+      left, prop = self.top
+      if isinstance(left.type_name, ArrayTypeName):
+        type_name = left.type_name
+        val = Store(left.val, prop.val, other.val)
+        constraint = And([
+          constraint_for_type_name(val, type_name),
+          prop.constraint,
+          other.constraint
+        ])
+        right = VariableRef(None, type_name, val, constraint)
+        left << right
+      else:
+        raise ValueError(left.type_name)
+    else:
+      assert self.name
+      state.store_const(self.name, other)
 
   def __getitem__(self, item):
     if isinstance(self.type_name, Mapping):
@@ -198,7 +221,7 @@ class VariableRef:
         self.constraint,
         item.constraint
       ])
-      return VariableRef(type_name, val, constraint)
+      return VariableRef(None, type_name, val, constraint)
     if isinstance(self.type_name, ArrayTypeName):
       type_name = self.type_name.base_type
       val = self.val[item.val]
@@ -207,10 +230,9 @@ class VariableRef:
         self.constraint,
         item.constraint
       ])
-      return VariableRef(type_name, val, constraint)
+      return VariableRef(None, type_name, val, constraint)
 
   def __getattr__(self, key):
-    
     if isinstance(self.type_name, UserDefinedTypeName):
       if isinstance(self.type_name.referenced, StructDefinition):
         for idx, var in enumerate(self.type_name.referenced.members):
@@ -221,7 +243,7 @@ class VariableRef:
               self.constraint,
               constraint_for_type_name(val, type_name)
             ])
-            return VariableRef(type_name, val, constraint)
+            return VariableRef(None, type_name, val, constraint)
 
     if isinstance(self.type_name, ElementaryTypeName):
       if self.type_name.name == 'address':
@@ -230,7 +252,7 @@ class VariableRef:
         sort = sort_for_type_name(type_name)
         val = Const('@B', sort)
         constraint = constraint_for_type_name(val, type_name)
-        tmp = VariableRef(type_name, val, constraint)
+        tmp = VariableRef(None, type_name, val, constraint)
         return tmp[self]
 
     if isinstance(self.type_name, ArrayTypeName):
@@ -241,7 +263,7 @@ class VariableRef:
       constraint = constraint_for_type_name(val, type_name)
       if self.type_name.length:
         constraint = And([constraint, val < int(self.type_name.length.value)])
-      return VariableRef(type_name, val, constraint)
+      return VariableRef(None, type_name, val, constraint)
 
     raise ValueError(key)
 
@@ -256,13 +278,13 @@ class StateRef:
     sort = sort_for_type_name(type_name)
     value = Const(name, sort)
     constraint = constraint_for_type_name(value, type_name)
-    self.variables[name] = VariableRef(type_name, value, constraint)
+    self.variables[name] = VariableRef(name, type_name, value, constraint)
 
   def mk_default_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
     value = Const(name, sort)
     constraint = default_for_type_name(value, type_name)
-    self.variables[name] = VariableRef(type_name, value, constraint)
+    self.variables[name] = VariableRef(name, type_name, value, constraint)
 
   def fetch_const(self, name):
     return self.variables[name]
@@ -276,31 +298,32 @@ class StateRef:
   def add_runtime_revert(self, revert):
     self.runtime_reverts = self.runtime_reverts | (self.conditions & revert)
 
-def visit_assignment(exp, state):
-  left = exp.left_hand_side
-  right = visit_expression(exp.right_hand_side, state)
-  if exp.operator == '+=':
-    right = visit_expression(exp.left_hand_side, state) + visit_expression(exp.right_hand_side, state)
-  if exp.operator == '-=':
-    right = visit_expression(exp.left_hand_side, state) - visit_expression(exp.right_hand_side, state)
-  # TODO: handle assignment
-  while not isinstance(left, Identifier):
-    if isinstance(left, IndexAccess):
-      base = visit_expression(left.base_expression, state)
-      index = visit_expression(left.index_expression, state)
-      #
-      type_name = base.type_name
-      val = Store(base.val, index.val, right.val)
-      constraint = And([base.constraint, index.constraint, right.constraint])
-      right = VariableRef(type_name, val, constraint)
-      left = left.base_expression
-    else:
-      raise ValueError(left)
-  return state.store_const(left.name, right)
+  def init(self):
+    self.variables = {}
+    self.conditions = VariableRef(
+      None,
+      ElementaryTypeName('bool'),
+      BoolVal(True),
+      BoolVal(True)
+    )
+    self.runtime_reverts = VariableRef(
+      None,
+      ElementaryTypeName('bool'),
+      BoolVal(False),
+      BoolVal(True)
+    )
+    self.arith_check = True
 
-def visit_binary_operation(exp, state):
-  left_expression = visit_expression(exp.left_expression, state)
-  right_expression = visit_expression(exp.right_expression, state)
+state = StateRef({})
+
+def visit_assignment(exp):
+  left = visit_expression(exp.left_hand_side)
+  right = visit_expression(exp.right_hand_side)
+  left << right
+
+def visit_binary_operation(exp):
+  left_expression = visit_expression(exp.left_expression)
+  right_expression = visit_expression(exp.right_expression)
   if exp.operator == '+':
     return left_expression + right_expression
   if exp.operator == '-':
@@ -331,32 +354,32 @@ def visit_binary_operation(exp, state):
     return left_expression % right_expression
   raise ValueError(exp.operator)
 
-def visit_unary_operation(exp, state):
-  sub_expression = visit_expression(exp.sub_expression, state)
+def visit_unary_operation(exp):
+  sub_expression = visit_expression(exp.sub_expression)
   if exp.operator == '!':
     return sub_expression.__not__()
   if exp.operator == '++':
     assignment = Assignment(exp.sub_expression, Literal('number', '1'), '+=')
-    visit_assignment(assignment, state)
-    return visit_expression(exp.sub_expression, state)
+    visit_assignment(assignment)
+    return visit_expression(exp.sub_expression)
   if exp.operator == '--':
     assignment = Assignment(exp.sub_expression, Literal('number', '1'), '-=')
-    visit_assignment(assignment, state)
-    return visit_expression(exp.sub_expression, state)
+    visit_assignment(assignment)
+    return visit_expression(exp.sub_expression)
   raise ValueError(exp.operator)
 
-def visit_tuple_expression(exp, state):
-  tmp = [visit_expression(x, state) for x in exp.components]
+def visit_tuple_expression(exp):
+  tmp = [visit_expression(x) for x in exp.components]
   return tmp[0] if len(tmp) == 1 else tmp
 
-def visit_identifier(exp, state):
+def visit_identifier(exp):
   return state.fetch_const(exp.name)
 
-def visit_literal(exp, _):
+def visit_literal(exp):
   if exp.kind == 'bool':
     type_name = ElementaryTypeName('bool')
     value = BoolVal(exp.value == 'true')
-    return VariableRef(type_name, value)
+    return VariableRef(None, type_name, value)
   if exp.kind == 'number':
     if exp.value.startswith('0x'):
       int_val = int(exp.value, 16)
@@ -364,49 +387,49 @@ def visit_literal(exp, _):
       int_val = int(exp.value)
     type_name = ElementaryTypeName('uint')
     value = IntVal(int_val)
-    return VariableRef(type_name, value)
+    return VariableRef(None, type_name, value)
   raise ValueError(exp.kind)
 
-def visit_function_call(exp, state):
+def visit_function_call(exp):
   if exp.overridle:
     ret, block = exp.overridle
     for statement in block.statements:
       if isinstance(statement, ExpressionStatement):
-        visit_expression(statement.expression, state)
+        visit_expression(statement.expression)
       elif isinstance(statement, VariableDeclarationStatement):
         declarations = []
         for var in statement.declarations:
           state.mk_default_const(var.name, var.type_name)
           declarations.append(var.name)
         if statement.initial_value:
-          init = visit_expression(statement.initial_value, state)
+          init = visit_expression(statement.initial_value)
           for name, val in zip(declarations, init if is_array(init) else [init]):
             state.store_const(name, val)
       else:
         raise ValueError(statement)
-    return visit_expression(ret, state)
+    return visit_expression(ret)
 
   if exp.kind == 'typeConversion':
     if isinstance(exp.expression, ElementaryTypeNameExpression):
-      return visit_expression(exp.arguments[0], state)
+      return visit_expression(exp.arguments[0])
 
   if exp.kind == 'functionCall':
     if isinstance(exp.expression, Identifier):
       if exp.expression.name == 'revert':
-        condition = VariableRef(ElementaryTypeName('bool'), BoolVal(False), BoolVal(True))
+        condition = VariableRef(None, ElementaryTypeName('bool'), BoolVal(False), BoolVal(True))
         state.add_condition(condition)
         return
       if exp.expression.name == 'require':
-        condition = visit_expression(exp.arguments[0], state)
+        condition = visit_expression(exp.arguments[0])
         # state.add_runtime_revert(condition.__not__())
         state.add_condition(condition)
         return
       if exp.expression.name == 'assume':
-        condition = visit_expression(exp.arguments[0], state)
+        condition = visit_expression(exp.arguments[0])
         state.add_condition(condition)
         return
       if exp.expression.name == 'assert':
-        arg = visit_expression(exp.arguments[0], state)
+        arg = visit_expression(exp.arguments[0])
         pre = And([state.conditions.constraint, state.conditions.val, arg.constraint])
         assertion = Implies(pre, arg.val)
         solver = Solver()
@@ -417,7 +440,7 @@ def visit_function_call(exp, state):
           print(colored(f'    assert({arg.val})', 'yellow'))
         return
       if exp.expression.name == 'ok':
-        arg = visit_expression(exp.arguments[0], state)
+        arg = visit_expression(exp.arguments[0])
         assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
         solver = Solver()
         solver.add(assertion)
@@ -427,7 +450,7 @@ def visit_function_call(exp, state):
           print(colored(f'    ok({arg.val})', 'yellow'))
         return
       if exp.expression.name == 'err':
-        arg = visit_expression(exp.arguments[0], state)
+        arg = visit_expression(exp.arguments[0])
         assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
         solver = Solver()
         solver.add(assertion)
@@ -438,57 +461,57 @@ def visit_function_call(exp, state):
         return
   raise ValueError(exp)
 
-def visit_index_access(exp, state):
-  index_expression = visit_expression(exp.index_expression, state)
-  base_expression = visit_expression(exp.base_expression, state)
-  return base_expression[index_expression]
+def visit_index_access(exp):
+  index_expression = visit_expression(exp.index_expression)
+  base_expression = visit_expression(exp.base_expression)
+  tmp = base_expression[index_expression]
+  tmp.top = (base_expression, index_expression)
+  return tmp
 
-def visit_member_access(exp, state):
-  expression = visit_expression(exp.expression, state)
-  return getattr(expression, exp.member_name)
+def visit_member_access(exp):
+  expression = visit_expression(exp.expression)
+  tmp = getattr(expression, exp.member_name)
+  tmp.top = (expression, exp.member_name)
+  return tmp
 
-def visit_anything(exp, state):
+def visit_anything(exp):
   name = FreshConst(IntSort()).sexpr()
   state.mk_const(name, exp.type_name)
   return state.fetch_const(name)
 
-def visit_nothing(exp, state):
+def visit_nothing(exp):
   return FreshConst(BoolSort())
 
-def visit_expression(exp, state):
+def visit_expression(exp):
   if isinstance(exp, Assignment):
-    return visit_assignment(exp, state)
+    return visit_assignment(exp)
   if isinstance(exp, BinaryOperation):
-    return visit_binary_operation(exp, state)
+    return visit_binary_operation(exp)
   if isinstance(exp, Identifier):
-    return visit_identifier(exp, state)
+    return visit_identifier(exp)
   if isinstance(exp, UnaryOperation):
-    return visit_unary_operation(exp, state)
+    return visit_unary_operation(exp)
   if isinstance(exp, TupleExpression):
-    return visit_tuple_expression(exp, state)
+    return visit_tuple_expression(exp)
   if isinstance(exp, Literal):
-    return visit_literal(exp, state)
+    return visit_literal(exp)
   if isinstance(exp, FunctionCall):
-    return visit_function_call(exp, state)
+    return visit_function_call(exp)
   if isinstance(exp, IndexAccess):
-    return visit_index_access(exp, state)
+    return visit_index_access(exp)
   if isinstance(exp, MemberAccess):
-    return visit_member_access(exp, state)
+    return visit_member_access(exp)
   if isinstance(exp, Anything):
-    return visit_anything(exp, state)
+    return visit_anything(exp)
   if isinstance(exp, Nothing):
-    return visit_nothing(exp, state)
+    return visit_nothing(exp)
   if isinstance(exp, EmitStatement):
     return None
   raise ValueError(exp)
 
 def validate(root):
   for resources, parameters, returns, path in generate_execution_paths(root):
-    state = StateRef(
-      {},
-      VariableRef(ElementaryTypeName('bool'), BoolVal(True), BoolVal(True)),
-      VariableRef(ElementaryTypeName('bool'), BoolVal(False), BoolVal(True))
-    )
+    state.init()
     # state variables
     Msg = UserDefinedTypeName('Msg', StructDefinition('Msg', [
       VariableDeclaration('sender', ElementaryTypeName('address')),
@@ -506,23 +529,23 @@ def validate(root):
     # start validating every execution paths
     for statement in path:
       if isinstance(statement, ExpressionStatement):
-        visit_expression(statement.expression, state)
+        visit_expression(statement.expression)
       elif isinstance(statement, VariableDeclarationStatement):
         declarations = []
         for var in statement.declarations:
           state.mk_default_const(var.name, var.type_name)
           declarations.append(var.name)
         if statement.initial_value:
-          init = visit_expression(statement.initial_value, state)
+          init = visit_expression(statement.initial_value)
           for name, val in zip(declarations, init if is_array(init) else [init]):
             state.store_const(name, val)
       elif isinstance(statement, Return):
         if statement.expression:
-          init = visit_expression(statement.expression, state)
+          init = visit_expression(statement.expression)
           for r, val in zip(returns, init if is_array(init) else [init]):
             state.store_const(r.name, val)
       elif isinstance(statement, EmitStatement):
         pass
       else:
-        condition = visit_expression(statement, state)
+        condition = visit_expression(statement)
         state.add_condition(condition)
