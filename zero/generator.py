@@ -88,8 +88,4 @@ def generate_execution_paths(root):
           if part.body and part.body.statements:
             print(f'  func {part.name}')
             for path in compute_execution_paths(part.body):
-              if part.pre:
-                path = part.pre.statements + path
-              if part.post:
-                path += part.post.statements
               yield resources, part.parameters, part.returns, path

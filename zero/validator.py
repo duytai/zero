@@ -3,6 +3,10 @@ from .generator import *
 from copy import deepcopy
 from termcolor import colored
 from dataclasses import field
+from functools import partial
+
+state = None
+search = None
 
 def sort_for_type_name(type_name):
   if isinstance(type_name, ElementaryTypeName):
@@ -17,9 +21,10 @@ def sort_for_type_name(type_name):
     value_sort = sort_for_type_name(type_name.value_type)
     return ArraySort(key_sort, value_sort)
   if isinstance(type_name, UserDefinedTypeName):
-    if isinstance(type_name.referenced, StructDefinition):
+    referenced = next(search(type_name))
+    if isinstance(referenced, StructDefinition):
       dt = Datatype(type_name.name)
-      members = [(x.name, sort_for_type_name(x.type_name)) for x in type_name.referenced.members]
+      members = [(x.name, sort_for_type_name(x.type_name)) for x in referenced.members]
       dt.declare('data', *members)
       return dt.create()
   if isinstance(type_name, ArrayTypeName):
@@ -43,9 +48,10 @@ def constraint_for_type_name(value, type_name):
     key = FreshConst(key_sort)
     return ForAll(key, constraint_for_type_name(value[key], type_name.value_type))
   if isinstance(type_name, UserDefinedTypeName):
-    if isinstance(type_name.referenced, StructDefinition):
+    referenced = next(search(type_name))
+    if isinstance(referenced, StructDefinition):
       constraints = []
-      for idx, var in enumerate(type_name.referenced.members):
+      for idx, var in enumerate(referenced.members):
         member = value.sort().accessor(0, idx)(value)
         constraint = constraint_for_type_name(member, var.type_name)
         constraints.append(constraint)
@@ -234,8 +240,9 @@ class VariableRef:
 
   def __getattr__(self, key):
     if isinstance(self.type_name, UserDefinedTypeName):
-      if isinstance(self.type_name.referenced, StructDefinition):
-        for idx, var in enumerate(self.type_name.referenced.members):
+      referenced = next(search(self.type_name))
+      if isinstance(referenced, StructDefinition):
+        for idx, var in enumerate(referenced.members):
           if var.name == key:
             type_name = var.type_name
             val = self.val.sort().accessor(0, idx)(self.val)
@@ -394,23 +401,6 @@ def visit_literal(exp):
   raise ValueError(exp.kind)
 
 def visit_function_call(exp):
-  if exp.overridle:
-    ret, block = exp.overridle
-    for statement in block.statements:
-      if isinstance(statement, ExpressionStatement):
-        visit_expression(statement.expression)
-      elif isinstance(statement, VariableDeclarationStatement):
-        declarations = []
-        for var in statement.declarations:
-          state.mk_default_const(var.name, var.type_name)
-          declarations.append(var.name)
-        if statement.initial_value:
-          init = visit_expression(statement.initial_value)
-          for name, val in zip(declarations, init if is_array(init) else [init]):
-            state.store_const(name, val)
-      else:
-        raise ValueError(statement)
-    return visit_expression(ret)
 
   if exp.kind == 'typeConversion':
     if isinstance(exp.expression, ElementaryTypeNameExpression):
@@ -512,13 +502,12 @@ def visit_expression(exp):
   raise ValueError(exp)
 
 def validate(root):
+  global search
+  search = partial(type_search, root)
   for resources, parameters, returns, path in generate_execution_paths(root):
     state.init()
     # state variables
-    Msg = UserDefinedTypeName('Msg', StructDefinition('Msg', [
-      VariableDeclaration('sender', ElementaryTypeName('address')),
-      VariableDeclaration('value', ElementaryTypeName('uint')),
-    ]))
+    Msg = UserDefinedTypeName('struct Msg')
     msg = VariableDeclaration('msg', Msg)
     state.mk_const(msg.name, msg.type_name)
     state.mk_const('this', ElementaryTypeName('address'))
