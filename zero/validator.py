@@ -515,12 +515,12 @@ def visit_statement(statement, returns=None):
       declarations.append(var.name)
     if statement.initial_value:
       init = visit_expression(statement.initial_value)
-      for name, val in zip(declarations, init if is_array(init) else [init]):
+      for name, val in zip(declarations, init if isinstance(init, list) else [init]):
         state.store_const(name, val)
   elif isinstance(statement, Return):
     if statement.expression:
       init = visit_expression(statement.expression)
-      for r, val in zip(returns, init if is_array(init) else [init]):
+      for r, val in zip(returns, init if isinstance(init, list) else [init]):
         state.store_const(r.name, val)
   elif isinstance(statement, EmitStatement):
     pass

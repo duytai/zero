@@ -42,6 +42,7 @@ def type_search(root, libraries, type_name):
   raise ValueError(type_name)
 
 def parse(node):
+
   if node['nodeType'] == 'SourceUnit':
     nodes = [parse(x) for x in node['nodes']]
     return SourceUnit(nodes)
