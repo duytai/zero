@@ -97,6 +97,7 @@ class FunctionDefinition:
   parameters: List[VariableDeclaration]
   returns: List[VariableDeclaration]
   body: Optional[Any]
+  visibility: str
 
 @dataclass
 class Block:

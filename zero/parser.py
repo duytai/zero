@@ -59,7 +59,8 @@ def parse(node):
     parameters = [parse(x) for x in node['parameters']['parameters']]
     returns = [parse(x) for x in node['returnParameters']['parameters']]
     body = parse(node['body']) if node['body'] else None
-    return FunctionDefinition(name, parameters, returns, body)
+    visibility = node['visibility']
+    return FunctionDefinition(name, parameters, returns, body, visibility)
 
   if node['nodeType'] == 'VariableDeclaration':
     name = node['name']

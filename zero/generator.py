@@ -87,7 +87,7 @@ def generate_execution_paths(root):
     return contract.name, (variables, functions, libraries)
   # -----> For new contract or interface
   contracts = dict([handler(x) for x in root.nodes if isinstance(x, ContractDefinition)])
-  # Loading from int tree
+  # -----> Loading from int tree
   for contract in root.nodes:
     if isinstance(contract, ContractDefinition):
       variables = []
@@ -108,7 +108,8 @@ def generate_execution_paths(root):
       print(f'contract {contract.name}')
       for func in functions:
         if isinstance(func, FunctionDefinition):
-          if func.body and func.body.statements:
-            print(f'  func {func.name}')
-            for path in compute_execution_paths(func.body):
-              yield contracts, libraries, variables, functions, func, path
+          if func.visibility in ['public', 'external']:
+            if func.body and func.body.statements:
+              print(f'  func {func.name}')
+              for path in compute_execution_paths(func.body):
+                yield contracts, libraries, variables, functions, func, path
