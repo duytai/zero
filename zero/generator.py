@@ -79,13 +79,33 @@ def compute_execution_paths(statement):
     yield path
 
 def generate_execution_paths(root):
+  # Indexing
+  def handler(contract):
+    variables = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
+    functions = [x for x in contract.nodes if isinstance(x, FunctionDefinition)]
+    libraries = [x for x in contract.nodes if isinstance(x, UsingForDirective)]
+    return contract.name, (variables, functions, libraries)
+  contracts = dict([handler(x) for x in root.nodes if isinstance(x, ContractDefinition)])
+  # Loading from int tree
   for contract in root.nodes:
     if isinstance(contract, ContractDefinition):
+      variables = []
+      functions = []
+      libraries = []
+      # ----> Inheritance
+      for iht in contract.base_contracts:
+        ty, canonical_name = iht.base_name.name.split(' ')
+        assert ty, 'contract'
+        variables += contracts[canonical_name][0]
+        functions += contracts[canonical_name][1]
+        libraries += contracts[canonical_name][2]
+      # ----> MyOwn
+      variables += contracts[contract.name][0]
+      functions += contracts[contract.name][1]
+      libraries += contracts[contract.name][2]
+      # ----> Start verifing
       print(f'contract {contract.name}')
-      variables = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
-      functions = [x for x in contract.nodes if isinstance(x, FunctionDefinition)]
-      libraries = [x for x in contract.nodes if isinstance(x, UsingForDirective)]
-      for func in contract.nodes:
+      for func in functions:
         if isinstance(func, FunctionDefinition):
           if func.body and func.body.statements:
             print(f'  func {func.name}')

@@ -138,6 +138,7 @@ class Return:
 
 @dataclass
 class ContractDefinition:
+  base_contracts: List[Any]
   kind: str
   name: str
   nodes: List[Any]
@@ -162,6 +163,10 @@ class Anything:
 class UsingForDirective:
   type_name: Any
   library_name: Any
+
+@dataclass
+class InheritanceSpecifier:
+  base_name: Any
 
 @dataclass
 class EmitStatement: pass

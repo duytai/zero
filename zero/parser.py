@@ -42,8 +42,9 @@ def parse(node):
   if node['nodeType'] == 'ContractDefinition':
     kind = node['contractKind']
     name = node['name']
+    base_contracts = [parse(x) for x in node['baseContracts']]
     nodes  = [parse(x) for x in node['nodes']]
-    return ContractDefinition(kind, name, nodes)
+    return ContractDefinition(base_contracts, kind, name, nodes)
 
   if node['nodeType'] == 'FunctionDefinition':
     name = node['name']
@@ -173,5 +174,9 @@ def parse(node):
 
   if node['nodeType'] == 'ModifierDefinition':
     return ModifierDefinition()
+
+  if node['nodeType'] == 'InheritanceSpecifier':
+    base_name = parse(node['baseName'])
+    return InheritanceSpecifier(base_name)
 
   raise ValueError(node['nodeType'])

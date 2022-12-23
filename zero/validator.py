@@ -590,12 +590,12 @@ def sol_address(arguments):
   return visit_expression(arguments[0])
 
 def sol_func(function, arguments):
-  statements = []
+  before, mid, after = [], [], []
   returns = []
   data = {}
   for x in function.returns:
     name = next(gn.names())
-    statements.append(
+    before.append(
       VariableDeclarationStatement([
         VariableDeclaration(name, x.type_name)
       ], Anything(x.type_name))
@@ -603,7 +603,7 @@ def sol_func(function, arguments):
     returns.append(Identifier(name))
   for var, value in zip(function.parameters + function.returns, arguments + returns):
     name = next(gn.names())
-    statements.append(
+    before.append(
       VariableDeclarationStatement([
         VariableDeclaration(name, var.type_name)
       ], value)
@@ -612,7 +612,8 @@ def sol_func(function, arguments):
   # Replace idents
   @dataclass
   class B(ExpVisitor):
-    statements = []
+    before = []
+    mid = []
     def __init__(self, data):
       self.data = data
     def visit_identifier(self, exp):
@@ -622,12 +623,17 @@ def sol_func(function, arguments):
     def visit_function_call(self, node):
       if isinstance(node.expression, Identifier):
         if node.expression.name == 'old_uint':
+          name = next(gn.names())
           ident = self.visit_expression(node.arguments[0])
+          stmt = VariableDeclarationStatement([
+            VariableDeclaration(name, ElementaryTypeName('uint'))
+          ], ident)
+          self.before.append(stmt)
           stmt = ExpressionStatement(
             Assignment(ident, Anything(ElementaryTypeName('uint')), '=')
           )
-          self.statements.append(stmt)
-          return ident
+          self.mid.append(stmt)
+          return Identifier(name)
       return node
   # Search ensures
   for statement in function.body.statements:
@@ -640,19 +646,20 @@ def sol_func(function, arguments):
             b = B(data)
             pre, post = call.arguments
             names = list(islice(gn.names(), 2))
-            statements.append(
+            before.append(
               VariableDeclarationStatement([
                 VariableDeclaration(names[0], ElementaryTypeName('bool'))
               ], b.visit_expression(pre))
             )
             pp = b.visit_expression(post)
-            statements.extend(b.statements)
-            statements.append(
+            before += b.before
+            mid += b.mid
+            after.append(
               VariableDeclarationStatement([
                 VariableDeclaration(names[1], ElementaryTypeName('bool'))
               ], pp)
             )
-            statements.append(
+            after.append(
               ExpressionStatement(
                 FunctionCall('functionCall', Identifier('assume'), [
                   BinaryOperation(
@@ -663,7 +670,7 @@ def sol_func(function, arguments):
                 ])
               )
             )
-  for x in statements:
+  for x in before + mid + after:
     visit_statement(x)
   return visit_expression(TupleExpression(returns))
 
