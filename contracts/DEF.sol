@@ -9,9 +9,7 @@ contract DEF {
 
     function test() public {
         uint t = 100;
-        // for (uint i = 0; i < 2; i += 1) {
-            t = sub(t, 20);
-        // }   
+        t = sub(t, 20);
         assert(t == 80);
     }
 }

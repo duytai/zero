@@ -568,7 +568,7 @@
 					{
 						"id" : 57,
 						"nodeType" : "Block",
-						"src" : "242:143:0",
+						"src" : "242:78:0",
 						"statements" : 
 						[
 							{
@@ -649,7 +649,7 @@
 										"nodeType" : "Identifier",
 										"overloadedDeclarations" : [],
 										"referencedDeclaration" : 41,
-										"src" : "323:1:0",
+										"src" : "274:1:0",
 										"typeDescriptions" : 
 										{
 											"typeIdentifier" : "t_uint256",
@@ -670,7 +670,7 @@
 												"nodeType" : "Identifier",
 												"overloadedDeclarations" : [],
 												"referencedDeclaration" : 41,
-												"src" : "331:1:0",
+												"src" : "282:1:0",
 												"typeDescriptions" : 
 												{
 													"typeIdentifier" : "t_uint256",
@@ -687,7 +687,7 @@
 												"kind" : "number",
 												"lValueRequested" : false,
 												"nodeType" : "Literal",
-												"src" : "334:2:0",
+												"src" : "285:2:0",
 												"subdenomination" : null,
 												"typeDescriptions" : 
 												{
@@ -715,7 +715,7 @@
 											"nodeType" : "Identifier",
 											"overloadedDeclarations" : [],
 											"referencedDeclaration" : 37,
-											"src" : "327:3:0",
+											"src" : "278:3:0",
 											"typeDescriptions" : 
 											{
 												"typeIdentifier" : "t_function_internal_nonpayable$_t_uint256_$_t_uint256_$returns$_t_uint256_$",
@@ -730,14 +730,14 @@
 										"lValueRequested" : false,
 										"names" : [],
 										"nodeType" : "FunctionCall",
-										"src" : "327:10:0",
+										"src" : "278:10:0",
 										"typeDescriptions" : 
 										{
 											"typeIdentifier" : "t_uint256",
 											"typeString" : "uint256"
 										}
 									},
-									"src" : "323:14:0",
+									"src" : "274:14:0",
 									"typeDescriptions" : 
 									{
 										"typeIdentifier" : "t_uint256",
@@ -746,7 +746,7 @@
 								},
 								"id" : 50,
 								"nodeType" : "ExpressionStatement",
-								"src" : "323:14:0"
+								"src" : "274:14:0"
 							},
 							{
 								"expression" : 
@@ -774,7 +774,7 @@
 												"nodeType" : "Identifier",
 												"overloadedDeclarations" : [],
 												"referencedDeclaration" : 41,
-												"src" : "370:1:0",
+												"src" : "305:1:0",
 												"typeDescriptions" : 
 												{
 													"typeIdentifier" : "t_uint256",
@@ -794,7 +794,7 @@
 												"kind" : "number",
 												"lValueRequested" : false,
 												"nodeType" : "Literal",
-												"src" : "375:2:0",
+												"src" : "310:2:0",
 												"subdenomination" : null,
 												"typeDescriptions" : 
 												{
@@ -803,7 +803,7 @@
 												},
 												"value" : "80"
 											},
-											"src" : "370:7:0",
+											"src" : "305:7:0",
 											"typeDescriptions" : 
 											{
 												"typeIdentifier" : "t_bool",
@@ -825,7 +825,7 @@
 										"nodeType" : "Identifier",
 										"overloadedDeclarations" : [],
 										"referencedDeclaration" : 63,
-										"src" : "363:6:0",
+										"src" : "298:6:0",
 										"typeDescriptions" : 
 										{
 											"typeIdentifier" : "t_function_assert_pure$_t_bool_$returns$__$",
@@ -840,7 +840,7 @@
 									"lValueRequested" : false,
 									"names" : [],
 									"nodeType" : "FunctionCall",
-									"src" : "363:15:0",
+									"src" : "298:15:0",
 									"typeDescriptions" : 
 									{
 										"typeIdentifier" : "t_tuple$__$",
@@ -849,7 +849,7 @@
 								},
 								"id" : 56,
 								"nodeType" : "ExpressionStatement",
-								"src" : "363:15:0"
+								"src" : "298:15:0"
 							}
 						]
 					},
@@ -875,15 +875,15 @@
 						"src" : "242:0:0"
 					},
 					"scope" : 59,
-					"src" : "219:166:0",
+					"src" : "219:101:0",
 					"stateMutability" : "nonpayable",
 					"superFunction" : null,
 					"visibility" : "public"
 				}
 			],
 			"scope" : 60,
-			"src" : "0:387:0"
+			"src" : "0:322:0"
 		}
 	],
-	"src" : "0:387:0"
+	"src" : "0:322:0"
 }

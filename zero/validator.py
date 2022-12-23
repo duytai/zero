@@ -266,19 +266,12 @@ class VariableRef:
     if isinstance(self.type_name, ElementaryTypeName):
       if self.type_name.name == 'address':
         if key == 'balance':
-          # @B hold of mapping from address => balance
-          type_name = Mapping(ElementaryTypeName('address'), ElementaryTypeName('uint'))
-          sort = sort_for_type_name(type_name)
-          val = Const('@B', sort)
-          constraint = constraint_for_type_name(val, type_name)
-          tmp = VariableRef(type_name, val, constraint)
-          return tmp[self]
+          return state.fetch_const('@B')[self]
 
     if isinstance(self.type_name, ArrayTypeName):
       # Return the length of array
       type_name = ElementaryTypeName('uint')
-      name = f'{self.val.sexpr()}.length'
-      val = Const(name, IntSort())
+      val = FreshConst(IntSort())
       constraint = constraint_for_type_name(val, type_name)
       if self.type_name.length:
         constraint = And([constraint, val == int(self.type_name.length.value)])
@@ -319,13 +312,13 @@ class StateRef:
 
   def mk_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
-    value = Const(name, sort)
+    value = FreshConst(sort)
     constraint = constraint_for_type_name(value, type_name)
     self.variables[name] = VariableRef(type_name, value, constraint)
 
   def mk_default_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
-    value = Const(name, sort)
+    value = FreshConst(sort)
     constraint = default_for_type_name(value, type_name)
     self.variables[name] = VariableRef(type_name, value, constraint)
 
@@ -361,8 +354,8 @@ class StateRef:
 state = StateRef({})
 
 def visit_assignment(exp):
-  left = visit_expression(exp.left_hand_side)
   right = visit_expression(exp.right_hand_side)
+  left = visit_expression(exp.left_hand_side)
   if exp.operator == '+=':
     right = left + right
   if exp.operator == '-=':
@@ -462,7 +455,7 @@ def visit_member_access(exp):
   return tmp
 
 def visit_anything(exp):
-  name = FreshConst(IntSort()).sexpr()
+  name = next(gn.names())
   state.mk_const(name, exp.type_name)
   return state.fetch_const(name)
 
@@ -615,6 +608,8 @@ def solc_interface_function(function, arguments):
   return visit_expression(TupleExpression(returns))
 
 def sol_func(function, arguments):
+  # if function.visibility in ['private', 'internal']:
+  #   raise ValueError(function)
   before, mid, after = [], [], []
   returns = []
   data = {}
@@ -728,6 +723,15 @@ def validate(root):
     msg = VariableDeclaration('msg', Msg)
     state.mk_const(msg.name, msg.type_name)
     state.mk_const('this', ElementaryTypeName('address'))
+    # Balances
+    balances = VariableDeclaration(
+      '@B',
+      Mapping(
+        ElementaryTypeName('address'),
+        ElementaryTypeName('uint')
+      )
+    )
+    state.mk_const(balances.name, balances.type_name)
     # Global variables and parameters
     for var in variables + func.parameters:
       state.mk_const(var.name, var.type_name)
