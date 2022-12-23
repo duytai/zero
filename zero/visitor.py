@@ -110,6 +110,12 @@ class StmtVisitor:
   def visit_emit_statement(self, statement):
     return EmitStatement()
 
+  def visit_using_for_directive(self, statement):
+    return UsingForDirective(
+      statement.type_name,
+      statement.library_name
+    )
+
   def visit_statement(self, statement):
     if isinstance(statement, Block):
       return self.visit_block(statement)
@@ -125,6 +131,8 @@ class StmtVisitor:
       return self.visit_return(statement)
     if isinstance(statement, EmitStatement):
       return self.visit_emit_statement(statement)
+    if isinstance(statement, UsingForDirective):
+      return self.visit_using_for_directive(statement)
     raise ValueError(statement)
 
   def visit_return(self, statement):

@@ -97,6 +97,12 @@ class GlobalName:
 gn = GlobalName()
 
 @dataclass
+class FunctionRef:
+  name: str
+  is_library: bool
+  val: Any
+
+@dataclass
 class VariableRef:
   name: str
   type_name: Any
@@ -254,19 +260,7 @@ class VariableRef:
       return VariableRef(None, type_name, val, constraint)
 
   def __getattr__(self, key):
-    if isinstance(self.type_name, UserDefinedTypeName):
-      referenced = next(search(self.type_name))
-      if isinstance(referenced, StructDefinition):
-        for idx, var in enumerate(referenced.members):
-          if var.name == key:
-            type_name = var.type_name
-            val = self.val.sort().accessor(0, idx)(self.val)
-            constraint = And([
-              self.constraint,
-              constraint_for_type_name(val, type_name)
-            ])
-            return VariableRef(None, type_name, val, constraint)
-
+    # Check for default properties first
     if isinstance(self.type_name, ElementaryTypeName):
       if self.type_name.name == 'address':
         if key == 'balance':
@@ -277,11 +271,9 @@ class VariableRef:
           constraint = constraint_for_type_name(val, type_name)
           tmp = VariableRef(None, type_name, val, constraint)
           return tmp[self]
-      if self.type_name.name == 'uint':
-        raise ValueError(key)
 
     if isinstance(self.type_name, ArrayTypeName):
-      # return the length of array
+      # Return the length of array
       type_name = ElementaryTypeName('uint')
       name = f'{self.val.sexpr()}.length'
       val = Const(name, IntSort())
@@ -289,6 +281,26 @@ class VariableRef:
       if self.type_name.length:
         constraint = And([constraint, val == int(self.type_name.length.value)])
       return VariableRef(None, type_name, val, constraint)
+
+    # Then search for defined properties
+    referenced = next(search(self.type_name))
+
+    if isinstance(referenced, StructDefinition):
+      for idx, var in enumerate(referenced.members):
+        if var.name == key:
+          type_name = var.type_name
+          val = self.val.sort().accessor(0, idx)(self.val)
+          constraint = And([
+            self.constraint,
+            constraint_for_type_name(val, type_name)
+          ])
+          return VariableRef(None, type_name, val, constraint)
+
+    if isinstance(referenced, ContractDefinition):
+      if referenced.kind == 'library':
+        for idx, func in enumerate(referenced.nodes):
+          if func.name == key:
+            return FunctionRef(func.name, True, partial(sol_func, func))
 
     raise ValueError(key)
 
@@ -426,7 +438,9 @@ def visit_literal(exp):
 
 def visit_function_call(exp):
   func = visit_expression(exp.expression)
-  return func(exp.arguments)
+  if func.is_library:
+    return func.val([exp.expression.expression] + exp.arguments)
+  return func.val(exp.arguments)
 
 def visit_index_access(exp):
   index_expression = visit_expression(exp.index_expression)
@@ -655,19 +669,22 @@ def sol_func(function, arguments):
 
 def validate(root):
   global search
-  search = partial(type_search, root)
 
   # validate
-  for variables, functions, func, path in generate_execution_paths(root):
+  for libraries, variables, functions, func, path in generate_execution_paths(root):
     state.init()
+    search = partial(type_search, root, libraries)
     # visible functions
     for function in functions:
-      state.store_const(function.name, partial(sol_func, function))
+      state.store_const(
+        function.name,
+        FunctionRef(function.name, False, partial(sol_func, function))
+      )
     # State functions
-    state.store_const('assert', partial(sol_assert))
-    state.store_const('ensures', partial(sol_ensures))
-    state.store_const('address', partial(sol_address))
-    state.store_const('assume', partial(sol_assume))
+    state.store_const('assert', FunctionRef('assert', False, partial(sol_assert)))
+    state.store_const('ensures', FunctionRef('ensures', False, partial(sol_ensures)))
+    state.store_const('address', FunctionRef('address', False, partial(sol_address)))
+    state.store_const('assume', FunctionRef('assume', False, partial(sol_assume)))
     # State variables
     Msg = UserDefinedTypeName('struct Msg')
     msg = VariableDeclaration('msg', Msg)

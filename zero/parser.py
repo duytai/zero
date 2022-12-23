@@ -1,6 +1,17 @@
 from .ast import *
 
-def type_search(root, type_name):
+def type_search(root, libraries, type_name):
+  # Search library for simple type name
+  if isinstance(type_name, ElementaryTypeName):
+    for library in libraries:
+      if library.type_name == type_name:
+        library_name = library.library_name.name
+        ty, canonical_name = library_name.split(' ')
+        for node in root.nodes:
+          if isinstance(node, ContractDefinition):
+            if node.kind == ty and node.name == canonical_name:
+              yield node
+  # Search for contract or struct definition
   if isinstance(type_name, UserDefinedTypeName):
     ty, canonical_name = type_name.name.split(' ')
     # If is struct definition
@@ -29,9 +40,10 @@ def parse(node):
     return SourceUnit(nodes)
 
   if node['nodeType'] == 'ContractDefinition':
+    kind = node['contractKind']
     name = node['name']
     nodes  = [parse(x) for x in node['nodes']]
-    return ContractDefinition(name, nodes)
+    return ContractDefinition(kind, name, nodes)
 
   if node['nodeType'] == 'FunctionDefinition':
     name = node['name']
@@ -149,7 +161,9 @@ def parse(node):
     return ElementaryTypeNameExpression(node['typeName'])
 
   if node['nodeType'] == 'UsingForDirective':
-    return UsingForDirective()
+    type_name = parse(node['typeName'])
+    library_name = parse(node['libraryName'])
+    return UsingForDirective(type_name, library_name)
 
   if node['nodeType'] == 'EmitStatement':
     return EmitStatement()

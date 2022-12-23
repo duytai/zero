@@ -8,16 +8,16 @@ contract TestSuite {
   function ok(bool) internal pure;
 }
 
-// library SafeMath {
-//   function ensures(bool, bool) internal pure {}
-//   function add(uint x, uint y) internal pure returns(uint z) {
-//     ensures(true, z == x + y);
-//     return x + y;
-//   }
-// }
+library SafeMath {
+  function ensures(bool, bool) internal pure {}
+  function sub(uint x, uint y) internal pure returns(uint z) {
+    ensures(true, z == x - y);
+    return x - y;
+  }
+}
 
 contract ABC is TestSuite {
-  // using SafeMath for uint;
+  using SafeMath for uint;
   struct Hello {
     uint ax;
     uint bx;
@@ -31,23 +31,26 @@ contract ABC is TestSuite {
     counter += 1;
     return x + y;
   }
-  function test() public payable returns(uint m) {
-    // assert(hello.ax >= 0);
+  function test() public payable returns(uint z) {
+    assert(hello.ax >= 0);
     counter = 20;
-    uint k = add(m, 30);
-    assert(k == m + 30);
+    uint mm = add(z, 30);
+    assert(mm == 50);
+    uint jj = 90;
+    uint k = jj.sub(20);
+    assert(k == 70);
     assert(counter == 21);
-    // assert(address(this).balance >= 0);
-    // ensures(true, z == 89 + old_uint(c));
-    // uint m = 100;
-    // m++;
-    // m--;
-    // assert(m == 100);
-    // uint[10] memory lst;
-    // lst[0] = 10;
-    // assert(lst.length == 10);
-    // c = 987;
-    // z = 1000;
-    // assert(z == m + c);
+    assert(address(this).balance >= 0);
+    ensures(true, z == 89 + old_uint(c));
+    uint m = 100;
+    m++;
+    m--;
+    assert(m == 100);
+    uint[10] memory lst;
+    lst[0] = 10;
+    assert(lst.length == 10);
+    c = 987;
+    m = 1000;
+    assert(m == m + c);
   }
 }

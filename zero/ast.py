@@ -25,6 +25,11 @@ class BinaryOperation:
   right_expression: Any
   operator: str
 
+  def __repr__(self):
+    left = repr(self.left_expression)
+    right = repr(self.right_expression)
+    return f'{left} {self.operator} {right}'
+
 @dataclass
 class UnaryOperation:
   sub_expression: Any
@@ -45,6 +50,9 @@ class Assignment:
 class Identifier:
   name: str
 
+  def __repr__(self):
+    return self.name
+
 @dataclass
 class Literal:
   kind: str
@@ -55,6 +63,11 @@ class FunctionCall:
   kind: str
   expression: Any
   arguments: List[Any]
+
+  def __repr__(self):
+    left = repr(self.expression)
+    right = ','.join([repr(x) for x in self.arguments])
+    return f'{left}({right})'
 
 @dataclass
 class IndexAccess:
@@ -75,6 +88,9 @@ class VariableDeclaration:
   name: str
   type_name: Any
 
+  def __repr__(self):
+    return self.name
+
 @dataclass
 class FunctionDefinition:
   name: str
@@ -90,10 +106,18 @@ class Block:
 class ExpressionStatement:
   expression: Any
 
+  def __repr__(self):
+    return repr(self.expression)
+
 @dataclass
 class VariableDeclarationStatement:
   declarations: List[VariableDeclaration]
   initial_value: Optional[Any]
+
+  def __repr__(self):
+    left = ','.join([repr(x) for x in self.declarations])
+    right = repr(self.initial_value) if self.initial_value else None
+    return f'{left} = {right}'
 
 @dataclass
 class ForStatement:
@@ -114,6 +138,7 @@ class Return:
 
 @dataclass
 class ContractDefinition:
+  kind: str
   name: str
   nodes: List[Any]
 
@@ -134,7 +159,9 @@ class Anything:
   type_name: Any
 
 @dataclass
-class UsingForDirective: pass
+class UsingForDirective:
+  type_name: Any
+  library_name: Any
 
 @dataclass
 class EmitStatement: pass

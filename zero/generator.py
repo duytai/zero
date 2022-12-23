@@ -84,9 +84,10 @@ def generate_execution_paths(root):
       print(f'contract {contract.name}')
       variables = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
       functions = [x for x in contract.nodes if isinstance(x, FunctionDefinition)]
+      libraries = [x for x in contract.nodes if isinstance(x, UsingForDirective)]
       for func in contract.nodes:
         if isinstance(func, FunctionDefinition):
           if func.body and func.body.statements:
             print(f'  func {func.name}')
             for path in compute_execution_paths(func.body):
-              yield variables, functions, func, path
+              yield libraries, variables, functions, func, path
