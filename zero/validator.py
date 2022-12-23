@@ -26,6 +26,8 @@ def sort_for_type_name(type_name):
     value_sort = sort_for_type_name(type_name.value_type)
     return ArraySort(key_sort, value_sort)
   if isinstance(type_name, UserDefinedTypeName):
+    ty, canonical_name = type_name.name.split(' ')
+    if ty == 'contract': return IntSort()
     referenced = next(search(type_name))
     if isinstance(referenced, StructDefinition):
       dt = Datatype(type_name.name)
@@ -53,6 +55,8 @@ def constraint_for_type_name(value, type_name):
     key = FreshConst(key_sort)
     return ForAll(key, constraint_for_type_name(value[key], type_name.value_type))
   if isinstance(type_name, UserDefinedTypeName):
+    ty, canonical_name = type_name.name.split(' ')
+    if ty == 'contract': return value >= 0
     referenced = next(search(type_name))
     if isinstance(referenced, StructDefinition):
       constraints = []
@@ -589,6 +593,10 @@ def sol_assume(arguments):
 def sol_address(arguments):
   return visit_expression(arguments[0])
 
+# solidity interface assignment
+def solc_contract(arguments):
+  return visit_expression(arguments[0])
+
 def sol_func(function, arguments):
   before, mid, after = [], [], []
   returns = []
@@ -678,9 +686,15 @@ def validate(root):
   global search
 
   # validate
-  for libraries, variables, functions, func, path in generate_execution_paths(root):
+  for contracts, libraries, variables, functions, func, path in generate_execution_paths(root):
     state.init()
     search = partial(type_search, root, libraries)
+    # visible contracts
+    for name in contracts:
+      state.store_const(
+        name,
+        FunctionRef(name, False, partial(solc_contract))
+      )
     # visible functions
     for function in functions:
       state.store_const(

@@ -110,4 +110,4 @@ def generate_execution_paths(root):
           if func.body and func.body.statements:
             print(f'  func {func.name}')
             for path in compute_execution_paths(func.body):
-              yield libraries, variables, functions, func, path
+              yield contracts, libraries, variables, functions, func, path

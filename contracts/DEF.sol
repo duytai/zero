@@ -1,21 +1,25 @@
-contract DEF {
-	uint counter;
-	function ensures(bool, bool) internal {}
-	function old_uint(uint) internal returns(uint) {}
+contract Counter {
+    uint public count;
 
-	function add(uint x, uint y) public returns(uint z) {
-		ensures(true, z == x + y);
-		ensures(true, counter == old_uint(counter) + 1);
-		counter += 1;
-		return x + y;
-	}
+    function increment() external {
+        count += 1;
+    }
+}
 
-	function test() public {
-		counter = 20;
-		uint m = add(20, 40);
-		assert(counter == 24);
-		assert(counter == 21);
-		assert(m == 60);
-		assert(m == 61);
-	}
+interface ICounter {
+    function count() external view returns (uint);
+
+    function increment() external;
+}
+
+contract MyContract {
+    ICounter ic;
+    function incrementCounter(address _counter) external {
+        ic = ICounter(_counter);
+        // ic.increment();
+    }
+
+    function getCount(address _counter) external view returns (uint) {
+        // return ICounter(_counter).count();
+    }
 }

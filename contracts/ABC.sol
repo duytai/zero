@@ -40,6 +40,7 @@ contract ABC is Double {
     dd = 30;
     uint m = double(k, 2);
     assert(dd == 100);
+    assert(dd == 31);
     assert(m == k*2 + 4);
     assert(m == k*2 + 9);
   }
