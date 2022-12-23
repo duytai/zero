@@ -12,10 +12,10 @@
 		],
 		"MyContract" : 
 		[
-			43
+			54
 		]
 	},
-	"id" : 44,
+	"id" : 55,
 	"nodeType" : "SourceUnit",
 	"nodes" : 
 	[
@@ -158,7 +158,7 @@
 					"visibility" : "external"
 				}
 			],
-			"scope" : 44,
+			"scope" : 55,
 			"src" : "0:106:0"
 		},
 		{
@@ -266,7 +266,7 @@
 					"visibility" : "external"
 				}
 			],
-			"scope" : 44,
+			"scope" : 55,
 			"src" : "108:109:0"
 		},
 		{
@@ -275,10 +275,10 @@
 			"contractKind" : "contract",
 			"documentation" : null,
 			"fullyImplemented" : true,
-			"id" : 43,
+			"id" : 54,
 			"linearizedBaseContracts" : 
 			[
-				43
+				54
 			],
 			"name" : "MyContract",
 			"nodeType" : "ContractDefinition",
@@ -289,7 +289,7 @@
 					"id" : 22,
 					"name" : "ic",
 					"nodeType" : "VariableDeclaration",
-					"scope" : 43,
+					"scope" : 54,
 					"src" : "245:11:0",
 					"stateVariable" : true,
 					"storageLocation" : "default",
@@ -318,9 +318,9 @@
 				{
 					"body" : 
 					{
-						"id" : 33,
+						"id" : 38,
 						"nodeType" : "Block",
-						"src" : "315:67:0",
+						"src" : "315:64:0",
 						"statements" : 
 						[
 							{
@@ -415,11 +415,68 @@
 								"id" : 32,
 								"nodeType" : "ExpressionStatement",
 								"src" : "325:23:0"
+							},
+							{
+								"expression" : 
+								{
+									"argumentTypes" : null,
+									"arguments" : [],
+									"expression" : 
+									{
+										"argumentTypes" : [],
+										"expression" : 
+										{
+											"argumentTypes" : null,
+											"id" : 33,
+											"name" : "ic",
+											"nodeType" : "Identifier",
+											"overloadedDeclarations" : [],
+											"referencedDeclaration" : 22,
+											"src" : "358:2:0",
+											"typeDescriptions" : 
+											{
+												"typeIdentifier" : "t_contract$_ICounter_$20",
+												"typeString" : "contract ICounter"
+											}
+										},
+										"id" : 35,
+										"isConstant" : false,
+										"isLValue" : false,
+										"isPure" : false,
+										"lValueRequested" : false,
+										"memberName" : "increment",
+										"nodeType" : "MemberAccess",
+										"referencedDeclaration" : 19,
+										"src" : "358:12:0",
+										"typeDescriptions" : 
+										{
+											"typeIdentifier" : "t_function_external_nonpayable$__$returns$__$",
+											"typeString" : "function () external"
+										}
+									},
+									"id" : 36,
+									"isConstant" : false,
+									"isLValue" : false,
+									"isPure" : false,
+									"kind" : "functionCall",
+									"lValueRequested" : false,
+									"names" : [],
+									"nodeType" : "FunctionCall",
+									"src" : "358:14:0",
+									"typeDescriptions" : 
+									{
+										"typeIdentifier" : "t_tuple$__$",
+										"typeString" : "tuple()"
+									}
+								},
+								"id" : 37,
+								"nodeType" : "ExpressionStatement",
+								"src" : "358:14:0"
 							}
 						]
 					},
 					"documentation" : null,
-					"id" : 34,
+					"id" : 39,
 					"implemented" : true,
 					"kind" : "function",
 					"modifiers" : [],
@@ -436,7 +493,7 @@
 								"id" : 24,
 								"name" : "_counter",
 								"nodeType" : "VariableDeclaration",
-								"scope" : 34,
+								"scope" : 39,
 								"src" : "288:16:0",
 								"stateVariable" : false,
 								"storageLocation" : "default",
@@ -471,8 +528,8 @@
 						"parameters" : [],
 						"src" : "315:0:0"
 					},
-					"scope" : 43,
-					"src" : "262:120:0",
+					"scope" : 54,
+					"src" : "262:117:0",
 					"stateMutability" : "nonpayable",
 					"superFunction" : null,
 					"visibility" : "external"
@@ -480,13 +537,114 @@
 				{
 					"body" : 
 					{
-						"id" : 41,
+						"id" : 52,
 						"nodeType" : "Block",
-						"src" : "453:53:0",
-						"statements" : []
+						"src" : "450:50:0",
+						"statements" : 
+						[
+							{
+								"expression" : 
+								{
+									"argumentTypes" : null,
+									"arguments" : [],
+									"expression" : 
+									{
+										"argumentTypes" : [],
+										"expression" : 
+										{
+											"argumentTypes" : null,
+											"arguments" : 
+											[
+												{
+													"argumentTypes" : null,
+													"id" : 47,
+													"name" : "_counter",
+													"nodeType" : "Identifier",
+													"overloadedDeclarations" : [],
+													"referencedDeclaration" : 41,
+													"src" : "476:8:0",
+													"typeDescriptions" : 
+													{
+														"typeIdentifier" : "t_address",
+														"typeString" : "address"
+													}
+												}
+											],
+											"expression" : 
+											{
+												"argumentTypes" : 
+												[
+													{
+														"typeIdentifier" : "t_address",
+														"typeString" : "address"
+													}
+												],
+												"id" : 46,
+												"name" : "ICounter",
+												"nodeType" : "Identifier",
+												"overloadedDeclarations" : [],
+												"referencedDeclaration" : 20,
+												"src" : "467:8:0",
+												"typeDescriptions" : 
+												{
+													"typeIdentifier" : "t_type$_t_contract$_ICounter_$20_$",
+													"typeString" : "type(contract ICounter)"
+												}
+											},
+											"id" : 48,
+											"isConstant" : false,
+											"isLValue" : false,
+											"isPure" : false,
+											"kind" : "typeConversion",
+											"lValueRequested" : false,
+											"names" : [],
+											"nodeType" : "FunctionCall",
+											"src" : "467:18:0",
+											"typeDescriptions" : 
+											{
+												"typeIdentifier" : "t_contract$_ICounter_$20",
+												"typeString" : "contract ICounter"
+											}
+										},
+										"id" : 49,
+										"isConstant" : false,
+										"isLValue" : false,
+										"isPure" : false,
+										"lValueRequested" : false,
+										"memberName" : "count",
+										"nodeType" : "MemberAccess",
+										"referencedDeclaration" : 16,
+										"src" : "467:24:0",
+										"typeDescriptions" : 
+										{
+											"typeIdentifier" : "t_function_external_view$__$returns$_t_uint256_$",
+											"typeString" : "function () view external returns (uint256)"
+										}
+									},
+									"id" : 50,
+									"isConstant" : false,
+									"isLValue" : false,
+									"isPure" : false,
+									"kind" : "functionCall",
+									"lValueRequested" : false,
+									"names" : [],
+									"nodeType" : "FunctionCall",
+									"src" : "467:26:0",
+									"typeDescriptions" : 
+									{
+										"typeIdentifier" : "t_uint256",
+										"typeString" : "uint256"
+									}
+								},
+								"functionReturnParameters" : 45,
+								"id" : 51,
+								"nodeType" : "Return",
+								"src" : "460:33:0"
+							}
+						]
 					},
 					"documentation" : null,
-					"id" : 42,
+					"id" : 53,
 					"implemented" : true,
 					"kind" : "function",
 					"modifiers" : [],
@@ -494,17 +652,17 @@
 					"nodeType" : "FunctionDefinition",
 					"parameters" : 
 					{
-						"id" : 37,
+						"id" : 42,
 						"nodeType" : "ParameterList",
 						"parameters" : 
 						[
 							{
 								"constant" : false,
-								"id" : 36,
+								"id" : 41,
 								"name" : "_counter",
 								"nodeType" : "VariableDeclaration",
-								"scope" : 42,
-								"src" : "406:16:0",
+								"scope" : 53,
+								"src" : "403:16:0",
 								"stateVariable" : false,
 								"storageLocation" : "default",
 								"typeDescriptions" : 
@@ -514,10 +672,10 @@
 								},
 								"typeName" : 
 								{
-									"id" : 35,
+									"id" : 40,
 									"name" : "address",
 									"nodeType" : "ElementaryTypeName",
-									"src" : "406:7:0",
+									"src" : "403:7:0",
 									"stateMutability" : "nonpayable",
 									"typeDescriptions" : 
 									{
@@ -529,21 +687,21 @@
 								"visibility" : "internal"
 							}
 						],
-						"src" : "405:18:0"
+						"src" : "402:18:0"
 					},
 					"returnParameters" : 
 					{
-						"id" : 40,
+						"id" : 45,
 						"nodeType" : "ParameterList",
 						"parameters" : 
 						[
 							{
 								"constant" : false,
-								"id" : 39,
+								"id" : 44,
 								"name" : "",
 								"nodeType" : "VariableDeclaration",
-								"scope" : 42,
-								"src" : "447:4:0",
+								"scope" : 53,
+								"src" : "444:4:0",
 								"stateVariable" : false,
 								"storageLocation" : "default",
 								"typeDescriptions" : 
@@ -553,10 +711,10 @@
 								},
 								"typeName" : 
 								{
-									"id" : 38,
+									"id" : 43,
 									"name" : "uint",
 									"nodeType" : "ElementaryTypeName",
-									"src" : "447:4:0",
+									"src" : "444:4:0",
 									"typeDescriptions" : 
 									{
 										"typeIdentifier" : "t_uint256",
@@ -567,18 +725,18 @@
 								"visibility" : "internal"
 							}
 						],
-						"src" : "446:6:0"
+						"src" : "443:6:0"
 					},
-					"scope" : 43,
-					"src" : "388:118:0",
+					"scope" : 54,
+					"src" : "385:115:0",
 					"stateMutability" : "view",
 					"superFunction" : null,
 					"visibility" : "external"
 				}
 			],
-			"scope" : 44,
-			"src" : "219:289:0"
+			"scope" : 55,
+			"src" : "219:283:0"
 		}
 	],
-	"src" : "0:508:0"
+	"src" : "0:502:0"
 }

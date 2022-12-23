@@ -16,10 +16,10 @@ contract MyContract {
     ICounter ic;
     function incrementCounter(address _counter) external {
         ic = ICounter(_counter);
-        // ic.increment();
+        ic.increment();
     }
 
     function getCount(address _counter) external view returns (uint) {
-        // return ICounter(_counter).count();
+        return ICounter(_counter).count();
     }
 }

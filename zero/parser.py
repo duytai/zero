@@ -32,6 +32,13 @@ def type_search(root, libraries, type_name):
                 if isinstance(part, StructDefinition):
                   if part.name == struct_name:
                     yield part
+    # If is contract definition
+    if ty == 'contract':
+      for node in root.nodes:
+          if isinstance(node, ContractDefinition):
+            if node.name == canonical_name:
+              yield node
+
   raise ValueError(type_name)
 
 def parse(node):

@@ -305,6 +305,10 @@ class VariableRef:
         for idx, func in enumerate(referenced.nodes):
           if func.name == key:
             return FunctionRef(func.name, True, partial(sol_func, func))
+      if referenced.kind == 'interface':
+        for idx, func in enumerate(referenced.nodes):
+          if func.name == key:
+            return FunctionRef(func.name, False, partial(solc_interface_function, func))
 
     raise ValueError(key)
 
@@ -594,8 +598,23 @@ def sol_address(arguments):
   return visit_expression(arguments[0])
 
 # solidity interface assignment
-def solc_contract(arguments):
-  return visit_expression(arguments[0])
+# ICounter ic = ICounter(0x0000)
+def solc_interface(name, arguments):
+  var = visit_expression(arguments[0])
+  var.type_name = UserDefinedTypeName(f'contract {name}')
+  return var
+
+# solidity interface function
+def solc_interface_function(function, arguments):
+  returns = []
+  for var in function.returns:
+    name = next(gn.names())
+    stmt = VariableDeclarationStatement([
+      VariableDeclaration(name, var.type_name)
+    ], Anything(var.type_name))
+    visit_statement(stmt)
+    returns.append(Identifier(name))
+  return visit_expression(TupleExpression(returns))
 
 def sol_func(function, arguments):
   before, mid, after = [], [], []
@@ -693,7 +712,7 @@ def validate(root):
     for name in contracts:
       state.store_const(
         name,
-        FunctionRef(name, False, partial(solc_contract))
+        FunctionRef(name, False, partial(solc_interface, name))
       )
     # visible functions
     for function in functions:

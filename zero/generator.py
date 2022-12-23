@@ -85,6 +85,7 @@ def generate_execution_paths(root):
     functions = [x for x in contract.nodes if isinstance(x, FunctionDefinition)]
     libraries = [x for x in contract.nodes if isinstance(x, UsingForDirective)]
     return contract.name, (variables, functions, libraries)
+  # -----> For new contract or interface
   contracts = dict([handler(x) for x in root.nodes if isinstance(x, ContractDefinition)])
   # Loading from int tree
   for contract in root.nodes:
