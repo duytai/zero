@@ -60,7 +60,8 @@ def parse(node):
     returns = [parse(x) for x in node['returnParameters']['parameters']]
     body = parse(node['body']) if node['body'] else None
     visibility = node['visibility']
-    return FunctionDefinition(name, parameters, returns, body, visibility)
+    modifiers = [parse(x) for x in node['modifiers']]
+    return FunctionDefinition(name, parameters, returns, body, visibility, modifiers)
 
   if node['nodeType'] == 'VariableDeclaration':
     name = node['name']
@@ -182,10 +183,20 @@ def parse(node):
     return EventDefinition()
 
   if node['nodeType'] == 'ModifierDefinition':
-    return ModifierDefinition()
+    body = parse(node['body'])
+    parameters = [parse(x) for x in node['parameters']['parameters']]
+    return ModifierDefinition(body, parameters)
 
   if node['nodeType'] == 'InheritanceSpecifier':
     base_name = parse(node['baseName'])
     return InheritanceSpecifier(base_name)
+
+  if node['nodeType'] == 'ModifierInvocation':
+    modifier_name = parse(node['modifierName'])
+    arguments = [parse(x) for x in node['arguments']]
+    return ModifierInvocation(modifier_name, arguments)
+
+  if node['nodeType'] == 'PlaceholderStatement':
+    return PlaceholderStatement()
 
   raise ValueError(node['nodeType'])

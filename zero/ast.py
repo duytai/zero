@@ -98,6 +98,7 @@ class FunctionDefinition:
   returns: List[VariableDeclaration]
   body: Optional[Any]
   visibility: str
+  modifiers: List[Any]
 
 @dataclass
 class Block:
@@ -138,6 +139,9 @@ class Return:
   expression: Optional[Any]
 
 @dataclass
+class PlaceholderStatement: pass
+
+@dataclass
 class ContractDefinition:
   base_contracts: List[Any]
   kind: str
@@ -170,10 +174,17 @@ class InheritanceSpecifier:
   base_name: Any
 
 @dataclass
+class ModifierInvocation:
+  modifier_name: Any
+  arguments: List[Any]
+
+@dataclass
 class EmitStatement: pass
 
 @dataclass
 class EventDefinition: pass
 
 @dataclass
-class ModifierDefinition: pass
+class ModifierDefinition:
+  body: Any
+  parameters: List[Any]
