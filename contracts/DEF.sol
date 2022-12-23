@@ -9,7 +9,7 @@ contract DEF {
 
     function test() public {
         uint t = 100;
-        t = sub(t, 20);
-        assert(t == 80);
+        t = sub(30, 60);
+        assert(t == 70);
     }
 }

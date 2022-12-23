@@ -1,7 +1,7 @@
 from z3 import *
 from .generator import *
 from .visitor import *
-from copy import deepcopy
+from copy import copy
 from termcolor import colored
 from dataclasses import field
 from functools import partial
@@ -310,6 +310,13 @@ class StateRef:
   runtime_reverts: Optional[VariableRef] = None
   arith_check: bool = True
 
+  def __copy__(self):
+    _variables = dict(self.variables.items())
+    _conditions = self.conditions
+    _runtime_reverts = self.runtime_reverts
+    _arith_check = self.arith_check
+    return StateRef(_variables, _conditions, _runtime_reverts, _arith_check)
+
   def mk_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
     value = FreshConst(sort)
@@ -608,8 +615,30 @@ def solc_interface_function(function, arguments):
   return visit_expression(TupleExpression(returns))
 
 def sol_func(function, arguments):
-  # if function.visibility in ['private', 'internal']:
-  #   raise ValueError(function)
+  global state, before_all, after_all
+  # If it is a private funciton -> try to prove
+  if function.visibility in ['private', 'internal']:
+    _state, _before_all, _after_all = copy(state), before_all[::], after_all[::]
+    before_all, after_all = [], []
+    # Try to prove before using specification
+    for param, arg in zip(function.parameters, arguments):
+      statement = VariableDeclarationStatement([
+        VariableDeclaration(param.name, param.type_name)
+      ], arg)
+      visit_statement(statement)
+    for var in function.returns:
+      state.mk_default_const(var.name, var.type_name)
+    for path in compute_execution_paths(function.body):
+      for statement in path:
+        visit_statement(statement, function.returns)
+        while before_all:
+          visit_statement(before_all.pop(0), function.returns)
+      while after_all:
+        visit_statement(after_all.pop(0), function.returns)
+    # Reset state
+    state, before_all, after_all = _state, _before_all, _after_all
+
+  # Load specifications
   before, mid, after = [], [], []
   returns = []
   data = {}

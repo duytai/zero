@@ -568,7 +568,7 @@
 					{
 						"id" : 57,
 						"nodeType" : "Block",
-						"src" : "242:78:0",
+						"src" : "242:79:0",
 						"statements" : 
 						[
 							{
@@ -665,21 +665,26 @@
 										[
 											{
 												"argumentTypes" : null,
+												"hexValue" : "3330",
 												"id" : 46,
-												"name" : "t",
-												"nodeType" : "Identifier",
-												"overloadedDeclarations" : [],
-												"referencedDeclaration" : 41,
-												"src" : "282:1:0",
+												"isConstant" : false,
+												"isLValue" : false,
+												"isPure" : true,
+												"kind" : "number",
+												"lValueRequested" : false,
+												"nodeType" : "Literal",
+												"src" : "282:2:0",
+												"subdenomination" : null,
 												"typeDescriptions" : 
 												{
-													"typeIdentifier" : "t_uint256",
-													"typeString" : "uint256"
-												}
+													"typeIdentifier" : "t_rational_30_by_1",
+													"typeString" : "int_const 30"
+												},
+												"value" : "30"
 											},
 											{
 												"argumentTypes" : null,
-												"hexValue" : "3230",
+												"hexValue" : "3630",
 												"id" : 47,
 												"isConstant" : false,
 												"isLValue" : false,
@@ -687,14 +692,14 @@
 												"kind" : "number",
 												"lValueRequested" : false,
 												"nodeType" : "Literal",
-												"src" : "285:2:0",
+												"src" : "286:2:0",
 												"subdenomination" : null,
 												"typeDescriptions" : 
 												{
-													"typeIdentifier" : "t_rational_20_by_1",
-													"typeString" : "int_const 20"
+													"typeIdentifier" : "t_rational_60_by_1",
+													"typeString" : "int_const 60"
 												},
-												"value" : "20"
+												"value" : "60"
 											}
 										],
 										"expression" : 
@@ -702,12 +707,12 @@
 											"argumentTypes" : 
 											[
 												{
-													"typeIdentifier" : "t_uint256",
-													"typeString" : "uint256"
+													"typeIdentifier" : "t_rational_30_by_1",
+													"typeString" : "int_const 30"
 												},
 												{
-													"typeIdentifier" : "t_rational_20_by_1",
-													"typeString" : "int_const 20"
+													"typeIdentifier" : "t_rational_60_by_1",
+													"typeString" : "int_const 60"
 												}
 											],
 											"id" : 45,
@@ -730,14 +735,14 @@
 										"lValueRequested" : false,
 										"names" : [],
 										"nodeType" : "FunctionCall",
-										"src" : "278:10:0",
+										"src" : "278:11:0",
 										"typeDescriptions" : 
 										{
 											"typeIdentifier" : "t_uint256",
 											"typeString" : "uint256"
 										}
 									},
-									"src" : "274:14:0",
+									"src" : "274:15:0",
 									"typeDescriptions" : 
 									{
 										"typeIdentifier" : "t_uint256",
@@ -746,7 +751,7 @@
 								},
 								"id" : 50,
 								"nodeType" : "ExpressionStatement",
-								"src" : "274:14:0"
+								"src" : "274:15:0"
 							},
 							{
 								"expression" : 
@@ -774,7 +779,7 @@
 												"nodeType" : "Identifier",
 												"overloadedDeclarations" : [],
 												"referencedDeclaration" : 41,
-												"src" : "305:1:0",
+												"src" : "306:1:0",
 												"typeDescriptions" : 
 												{
 													"typeIdentifier" : "t_uint256",
@@ -786,7 +791,7 @@
 											"rightExpression" : 
 											{
 												"argumentTypes" : null,
-												"hexValue" : "3830",
+												"hexValue" : "3730",
 												"id" : 53,
 												"isConstant" : false,
 												"isLValue" : false,
@@ -794,16 +799,16 @@
 												"kind" : "number",
 												"lValueRequested" : false,
 												"nodeType" : "Literal",
-												"src" : "310:2:0",
+												"src" : "311:2:0",
 												"subdenomination" : null,
 												"typeDescriptions" : 
 												{
-													"typeIdentifier" : "t_rational_80_by_1",
-													"typeString" : "int_const 80"
+													"typeIdentifier" : "t_rational_70_by_1",
+													"typeString" : "int_const 70"
 												},
-												"value" : "80"
+												"value" : "70"
 											},
-											"src" : "305:7:0",
+											"src" : "306:7:0",
 											"typeDescriptions" : 
 											{
 												"typeIdentifier" : "t_bool",
@@ -825,7 +830,7 @@
 										"nodeType" : "Identifier",
 										"overloadedDeclarations" : [],
 										"referencedDeclaration" : 63,
-										"src" : "298:6:0",
+										"src" : "299:6:0",
 										"typeDescriptions" : 
 										{
 											"typeIdentifier" : "t_function_assert_pure$_t_bool_$returns$__$",
@@ -840,7 +845,7 @@
 									"lValueRequested" : false,
 									"names" : [],
 									"nodeType" : "FunctionCall",
-									"src" : "298:15:0",
+									"src" : "299:15:0",
 									"typeDescriptions" : 
 									{
 										"typeIdentifier" : "t_tuple$__$",
@@ -849,7 +854,7 @@
 								},
 								"id" : 56,
 								"nodeType" : "ExpressionStatement",
-								"src" : "298:15:0"
+								"src" : "299:15:0"
 							}
 						]
 					},
@@ -875,15 +880,15 @@
 						"src" : "242:0:0"
 					},
 					"scope" : 59,
-					"src" : "219:101:0",
+					"src" : "219:102:0",
 					"stateMutability" : "nonpayable",
 					"superFunction" : null,
 					"visibility" : "public"
 				}
 			],
 			"scope" : 60,
-			"src" : "0:322:0"
+			"src" : "0:323:0"
 		}
 	],
-	"src" : "0:322:0"
+	"src" : "0:323:0"
 }
