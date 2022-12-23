@@ -1,6 +1,7 @@
 from .ast import *
 
 def type_search(root, libraries, type_name):
+
   # Search library for simple type name
   if isinstance(type_name, ElementaryTypeName):
     for library in libraries:
@@ -23,6 +24,12 @@ def type_search(root, libraries, type_name):
           VariableDeclaration('value', ElementaryTypeName('uint'))
         ]
         yield StructDefinition('struct Msg', members)
+      elif canonical_name == 'Block':
+        members = [
+          VariableDeclaration('number', ElementaryTypeName('uint')),
+          VariableDeclaration('timestamp', ElementaryTypeName('uint'))
+        ]
+        yield StructDefinition('struct Block', members)
       else:
         contract_name, struct_name = canonical_name.split('.')
         for node in root.nodes:

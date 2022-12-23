@@ -238,6 +238,16 @@ class VariableRef:
         ])
         right = VariableRef(type_name, val, constraint)
         left << right
+      elif isinstance(left.type_name, Mapping):
+        type_name = left.type_name
+        val = Store(left.val, prop.val, other.val)
+        constraint = And([
+          constraint_for_type_name(val, type_name),
+          prop.constraint,
+          other.constraint
+        ])
+        right = VariableRef(type_name, val, constraint)
+        left << right
       else:
         raise ValueError(left.type_name)
 
@@ -507,14 +517,14 @@ def visit_statement(statement, returns=None):
   if isinstance(statement, ExpressionStatement):
     visit_expression(statement.expression)
   elif isinstance(statement, VariableDeclarationStatement):
-    declarations = []
-    for var in statement.declarations:
-      state.mk_default_const(var.name, var.type_name)
-      declarations.append(var.name)
+    declarations = [x.name for x in statement.declarations]
     if statement.initial_value:
       init = visit_expression(statement.initial_value)
       for name, val in zip(declarations, init if isinstance(init, list) else [init]):
         state.store_const(name, val)
+    else:
+      for var in statement.declarations:
+        state.mk_default_const(var.name, var.type_name)
   elif isinstance(statement, Return):
     if statement.expression:
       init = visit_expression(statement.expression)
@@ -573,6 +583,17 @@ def sol_ensures(arguments):
   after_all.append(stmt)
   return FreshConst(BoolSort())
 
+# solidity ok functions
+def sol_ok(arguments):
+  arg = visit_expression(arguments[0])
+  assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
+  solver = Solver()
+  solver.add(assertion)
+  if solver.check() == sat:
+    print(colored(f'    ok({arg.val})', 'green'))
+  else:
+    print(colored(f'    ok({arg.val})', 'yellow'))
+
 # solidity assert functions
 def sol_assert(arguments):
   arg = visit_expression(arguments[0])
@@ -584,7 +605,11 @@ def sol_assert(arguments):
     print(colored(f'    assert({arg.val})', 'green'))
   else:
     print(colored(f'    assert({arg.val})', 'yellow'))
-  return FreshConst(BoolSort())
+
+# solidity require function
+def sol_require(arguments):
+  arg = visit_expression(arguments[0])
+  state.add_condition(arg)
 
 # solidity assume function
 def sol_assume(arguments):
@@ -619,22 +644,25 @@ def sol_func(function, arguments):
   # If it is a private funciton -> try to prove
   if function.visibility in ['private', 'internal']:
     _state, _before_all, _after_all = copy(state), before_all[::], after_all[::]
-    before_all, after_all = [], []
     # Try to prove before using specification
     for param, arg in zip(function.parameters, arguments):
       statement = VariableDeclarationStatement([
         VariableDeclaration(param.name, param.type_name)
-      ], arg)
+      ], Anything(param.type_name))
       visit_statement(statement)
     for var in function.returns:
       state.mk_default_const(var.name, var.type_name)
+    # Backup here
+    before_all, after_all = [], []
     for path in compute_execution_paths(function.body):
+      __state = copy(state)
       for statement in path:
         visit_statement(statement, function.returns)
         while before_all:
           visit_statement(before_all.pop(0), function.returns)
       while after_all:
         visit_statement(after_all.pop(0), function.returns)
+      state = __state
     # Reset state
     state, before_all, after_all = _state, _before_all, _after_all
 
@@ -743,14 +771,21 @@ def validate(root):
         FunctionRef(False, partial(sol_func, function))
       )
     # State functions
+    state.store_const('ok', FunctionRef(False, partial(sol_ok)))
     state.store_const('assert', FunctionRef(False, partial(sol_assert)))
+    state.store_const('require', FunctionRef(False, partial(sol_require)))
     state.store_const('ensures', FunctionRef(False, partial(sol_ensures)))
     state.store_const('address', FunctionRef(False, partial(sol_address)))
     state.store_const('assume', FunctionRef(False, partial(sol_assume)))
-    # State variables
+    # Block
+    Block = UserDefinedTypeName('struct Block')
+    block = VariableDeclaration('block', Block)
+    state.mk_const(block.name, block.type_name)
+    # Msg
     Msg = UserDefinedTypeName('struct Msg')
     msg = VariableDeclaration('msg', Msg)
     state.mk_const(msg.name, msg.type_name)
+    #
     state.mk_const('this', ElementaryTypeName('address'))
     # Balances
     balances = VariableDeclaration(
