@@ -280,6 +280,7 @@ class VariableRef:
 
     if isinstance(self.type_name, ArrayTypeName):
       # Return the length of array
+      # TODO: load length constraint
       type_name = ElementaryTypeName('uint')
       val = FreshConst(IntSort())
       constraint = constraint_for_type_name(val, type_name)
@@ -484,6 +485,22 @@ def visit_elementary_type_name_expression(exp):
     return state.fetch_const('address')
   raise ValueError(exp)
 
+def visit_new_expression(exp):
+  def new(exp, arguments):
+    type_name = exp.type_name
+    if isinstance(type_name, ArrayTypeName):
+      base_type = type_name.base_type
+      if isinstance(base_type, ElementaryTypeName):
+        if base_type.name == 'uint':
+          sort = sort_for_type_name(type_name)
+          val = FreshConst(sort)
+          constraint = default_for_type_name(val, type_name)
+          # TODO: add length constraint
+          e = visit_expression(arguments[0])
+          return VariableRef(type_name, val, constraint)
+    raise ValueError(exp)
+  return FunctionRef(False, partial(new, exp))
+
 def visit_expression(exp):
   if isinstance(exp, Assignment):
     return visit_assignment(exp)
@@ -509,8 +526,8 @@ def visit_expression(exp):
     return visit_nothing(exp)
   if isinstance(exp, ElementaryTypeNameExpression):
     return visit_elementary_type_name_expression(exp)
-  if isinstance(exp, EmitStatement):
-    return None
+  if isinstance(exp, NewExpression):
+    return visit_new_expression(exp)
   raise ValueError(exp)
 
 def visit_statement(statement, returns=None):
