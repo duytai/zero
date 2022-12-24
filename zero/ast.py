@@ -188,3 +188,19 @@ class EventDefinition: pass
 class ModifierDefinition:
   body: Any
   parameters: List[Any]
+
+@dataclass
+class InlineAssembly: pass
+
+@dataclass
+class PragmaDirective: pass
+
+@dataclass
+class Conditional:
+  condition: Any
+  true_expression: Any
+  false_expression: Any
+
+@dataclass
+class NewExpression:
+  type_name: Any

@@ -200,10 +200,26 @@ def parse(node):
 
   if node['nodeType'] == 'ModifierInvocation':
     modifier_name = parse(node['modifierName'])
-    arguments = [parse(x) for x in node['arguments']]
+    arguments = [parse(x) for x in node['arguments']] if node['arguments'] else []
     return ModifierInvocation(modifier_name, arguments)
 
   if node['nodeType'] == 'PlaceholderStatement':
     return PlaceholderStatement()
+
+  if node['nodeType'] == 'Conditional':
+    condition = parse(node['condition'])
+    true_expression = parse(node['trueExpression'])
+    false_expression = parse(node['falseExpression'])
+    return Conditional(condition, true_expression, false_expression)
+
+  if node['nodeType'] == 'InlineAssembly':
+    return InlineAssembly()
+
+  if node['nodeType'] == 'PragmaDirective':
+    return PragmaDirective()
+
+  if node['nodeType'] == 'NewExpression':
+    type_name = parse(node['typeName'])
+    return NewExpression(type_name)
 
   raise ValueError(node['nodeType'])
