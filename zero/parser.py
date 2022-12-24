@@ -187,7 +187,8 @@ def parse(node):
     return EmitStatement()
 
   if node['nodeType'] == 'EventDefinition':
-    return EventDefinition()
+    name = node['name']
+    return EventDefinition(name)
 
   if node['nodeType'] == 'ModifierDefinition':
     body = parse(node['body'])

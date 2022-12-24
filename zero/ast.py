@@ -182,7 +182,8 @@ class ModifierInvocation:
 class EmitStatement: pass
 
 @dataclass
-class EventDefinition: pass
+class EventDefinition:
+  name: str
 
 @dataclass
 class ModifierDefinition:

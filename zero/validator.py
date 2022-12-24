@@ -81,6 +81,8 @@ def default_for_type_name(value, type_name):
       return value == BoolVal(False)
     if type_name.name == 'address':
       return value == 0
+    if type_name.name == 'string':
+      return value == StringVal('')
   if isinstance(type_name, ArrayTypeName):
     key = FreshConst(IntSort())
     constraint = ForAll(key, default_for_type_name(value[key], type_name.base_type))
@@ -491,13 +493,12 @@ def visit_new_expression(exp):
     if isinstance(type_name, ArrayTypeName):
       base_type = type_name.base_type
       if isinstance(base_type, ElementaryTypeName):
-        if base_type.name == 'uint':
-          sort = sort_for_type_name(type_name)
-          val = FreshConst(sort)
-          constraint = default_for_type_name(val, type_name)
-          # TODO: add length constraint
-          e = visit_expression(arguments[0])
-          return VariableRef(type_name, val, constraint)
+        sort = sort_for_type_name(type_name)
+        val = FreshConst(sort)
+        constraint = default_for_type_name(val, type_name)
+        # TODO: add length constraint
+        # e = visit_expression(arguments[0])
+        return VariableRef(type_name, val, constraint)
     raise ValueError(exp)
   return FunctionRef(False, partial(new, exp))
 
