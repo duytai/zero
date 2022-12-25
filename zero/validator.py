@@ -380,7 +380,36 @@ def visit_assignment(exp):
     right = left + right
   if exp.operator == '-=':
     right = left - right
+
+  tmp = next(gn.names())
+  ident = None
+  if isinstance(exp.left_hand_side, IndexAccess):
+    ident = exp.left_hand_side.base_expression
+    if isinstance(ident, Identifier):
+      statement = VariableDeclarationStatement([
+        VariableDeclaration(tmp, ElementaryTypeName('uint'))
+      ], exp.left_hand_side)
+      visit_statement(statement)
+
   left << right
+
+  if ident:
+    statement = ExpressionStatement(
+      Assignment(
+        Identifier(f'sum_{ident.name}'),
+        BinaryOperation(
+          BinaryOperation(
+            Identifier(f'sum_{ident.name}'),
+            Identifier(tmp),
+            '-'
+          ),
+          exp.left_hand_side,
+          '+'
+        ),
+        '='
+      )
+    )
+    visit_statement(statement)
 
 def visit_binary_operation(exp):
   left_expression = visit_expression(exp.left_expression)
@@ -638,6 +667,11 @@ def sol_assume(arguments):
 def sol_address(arguments):
   return visit_expression(arguments[0])
 
+# solidity sum(balances)
+def sol_sum(arguments):
+  name = arguments[0].name
+  return visit_expression(Identifier(f'sum_{name}'))
+
 # solidity interface assignment
 # ICounter ic = ICounter(0x0000)
 def solc_interface(name, arguments):
@@ -814,6 +848,13 @@ def validate(root):
       )
     )
     state.mk_const(balances.name, balances.type_name)
+    # Create a variable for sum
+    for var in variables:
+      if isinstance(var.type_name, Mapping):
+        type_name = var.type_name
+        if isinstance(type_name.value_type, ElementaryTypeName):
+          state.mk_const(f'sum_{var.name}', type_name.value_type)
+          state.store_const(f'sum_uint', FunctionRef(False, partial(sol_sum)))
     # Global variables and parameters
     for var in variables + func.parameters:
       state.mk_const(var.name, var.type_name)
