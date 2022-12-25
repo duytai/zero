@@ -384,8 +384,8 @@ def visit_assignment(exp):
   tmp = next(gn.names())
   ident = None
   if isinstance(exp.left_hand_side, IndexAccess):
-    ident = exp.left_hand_side.base_expression
-    if isinstance(ident, Identifier):
+    if isinstance(exp.left_hand_side.base_expression, Identifier):
+      ident = exp.left_hand_side.base_expression
       statement = VariableDeclarationStatement([
         VariableDeclaration(tmp, ElementaryTypeName('uint'))
       ], exp.left_hand_side)
@@ -672,6 +672,11 @@ def sol_sum(arguments):
   name = arguments[0].name
   return visit_expression(Identifier(f'sum_{name}'))
 
+# solidity reverts_if()
+def sol_reverts_if(arguments):
+  # TODO: handle reverts if
+  return None
+
 # solidity interface assignment
 # ICounter ic = ICounter(0x0000)
 def solc_interface(name, arguments):
@@ -829,6 +834,7 @@ def validate(root):
     state.store_const('ensures', FunctionRef(False, partial(sol_ensures)))
     state.store_const('address', FunctionRef(False, partial(sol_address)))
     state.store_const('assume', FunctionRef(False, partial(sol_assume)))
+    state.store_const('reverts_if', FunctionRef(False, partial(sol_reverts_if)))
     # Block
     Block = UserDefinedTypeName('struct Block')
     block = VariableDeclaration('block', Block)
