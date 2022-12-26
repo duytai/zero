@@ -4,20 +4,15 @@ from dataclasses import dataclass
 @dataclass
 class ElementaryTypeName:
   name: str
-  def __repr__(self):
-    return self.name
 
 @dataclass
 class Mapping:
   key_type: Any
   value_type: Any
-  def __repr__(self):
-    return f'({repr(self.key_type)}=>{repr(self.value_type)})'
 
 @dataclass
 class UserDefinedTypeName:
   name: str
-  referenced: Any
 
 @dataclass
 class ArrayTypeName:
@@ -29,8 +24,11 @@ class BinaryOperation:
   left_expression: Any
   right_expression: Any
   operator: str
+
   def __repr__(self):
-    return f'{repr(self.left_expression)} {self.operator} {repr(self.right_expression)}'
+    left = repr(self.left_expression)
+    right = repr(self.right_expression)
+    return f'{left} {self.operator} {right}'
 
 @dataclass
 class UnaryOperation:
@@ -41,20 +39,17 @@ class UnaryOperation:
 @dataclass
 class TupleExpression:
   components: List[Any]
-  def __repr__(self):
-    return f'({",".join([repr(x) for x in self.components])})'
 
 @dataclass
 class Assignment:
   left_hand_side: Any
   right_hand_side: Any
   operator: str
-  def __repr__(self):
-    return f'{repr(self.left_hand_side)} {self.operator} {repr(self.right_hand_side)}'
 
 @dataclass
 class Identifier:
   name: str
+
   def __repr__(self):
     return self.name
 
@@ -62,34 +57,27 @@ class Identifier:
 class Literal:
   kind: str
   value: str
-  def __repr__(self):
-    return self.value
 
 @dataclass
 class FunctionCall:
   kind: str
   expression: Any
   arguments: List[Any]
-  overridle: Optional[Any] = None
+
   def __repr__(self):
-    if self.overridle:
-      ret, block = self.overridle
-      return f'||{repr(block)}|| {repr(ret)}'
-    return f'{repr(self.expression)}({",".join([repr(x) for x in self.arguments])})'
+    left = repr(self.expression)
+    right = ','.join([repr(x) for x in self.arguments])
+    return f'{left}({right})'
 
 @dataclass
 class IndexAccess:
   index_expression: Any
   base_expression: Any
-  def __repr__(self):
-    return f'{repr(self.base_expression)}[{repr(self.index_expression)}]'
 
 @dataclass
 class MemberAccess:
   member_name: str
   expression: Any
-  def __repr__(self):
-    return f'{repr(self.expression)}.{self.member_name}'
 
 @dataclass
 class ElementaryTypeNameExpression:
@@ -99,8 +87,9 @@ class ElementaryTypeNameExpression:
 class VariableDeclaration:
   name: str
   type_name: Any
+
   def __repr__(self):
-    return f'{repr(self.type_name)} {self.name}'
+    return self.name
 
 @dataclass
 class FunctionDefinition:
@@ -108,43 +97,29 @@ class FunctionDefinition:
   parameters: List[VariableDeclaration]
   returns: List[VariableDeclaration]
   body: Optional[Any]
-  before: Any = None
-  after: Any = None
-  def __repr__(self):
-    parameters = ', '.join([repr(x) for x in self.parameters])
-    returns = ', '.join([repr(x) for x in self.returns])
-    body = ''
-    if self.body:
-      if self.pre:
-        body += f'||{repr(self.pre)}||\n'
-      body += repr(self.body) + '\n'
-      if self.post:
-        body += f'||{repr(self.post)}||'
-      body = '\n'.join([f'\t\t{x}' for x in body.split('\n')])
-    if not body:
-      return f'func {self.name}({parameters}) -> ({returns}) {{}}'
-    return f'func {self.name}({parameters}) -> ({returns}):\n {body}'
+  visibility: str
+  modifiers: List[Any]
 
 @dataclass
 class Block:
   statements: List[Any]
-  def __repr__(self):
-    return '\n'.join([repr(x) for x in self.statements])
 
 @dataclass
 class ExpressionStatement:
   expression: Any
+
   def __repr__(self):
-    return f'{repr(self.expression)};'
+    return repr(self.expression)
 
 @dataclass
 class VariableDeclarationStatement:
   declarations: List[VariableDeclaration]
   initial_value: Optional[Any]
+
   def __repr__(self):
-    right = repr(self.initial_value) if self.initial_value else '?'
     left = ','.join([repr(x) for x in self.declarations])
-    return f'{left} = {right};'
+    right = repr(self.initial_value) if self.initial_value else None
+    return f'{left} = {right}'
 
 @dataclass
 class ForStatement:
@@ -162,16 +137,16 @@ class IfStatement:
 @dataclass
 class Return:
   expression: Optional[Any]
-  def __repr__(self):
-    return f'return {repr(self.expression)}' if self.expression else 'return'
+
+@dataclass
+class PlaceholderStatement: pass
 
 @dataclass
 class ContractDefinition:
+  base_contracts: List[Any]
+  kind: str
   name: str
   nodes: List[Any]
-  def __repr__(self):
-    body = '\n'.join([f'\t{repr(x)}' for x in self.nodes])
-    return f'contract {self.name}: \n{body}'
 
 @dataclass
 class StructDefinition:
@@ -181,8 +156,6 @@ class StructDefinition:
 @dataclass
 class SourceUnit:
   nodes: List[Any]
-  def __repr__(self):
-    return '\n'.join([repr(x) for x in self.nodes])
 
 @dataclass
 class Nothing: pass
@@ -190,17 +163,45 @@ class Nothing: pass
 @dataclass
 class Anything:
   type_name: Any
-  def __repr__(self):
-    return '*'
 
 @dataclass
-class UsingForDirective: pass
+class UsingForDirective:
+  type_name: Any
+  library_name: Any
+
+@dataclass
+class InheritanceSpecifier:
+  base_name: Any
+
+@dataclass
+class ModifierInvocation:
+  modifier_name: Any
+  arguments: List[Any]
 
 @dataclass
 class EmitStatement: pass
 
 @dataclass
-class EventDefinition: pass
+class EventDefinition:
+  name: str
 
 @dataclass
-class ModifierDefinition: pass
+class ModifierDefinition:
+  body: Any
+  parameters: List[Any]
+
+@dataclass
+class InlineAssembly: pass
+
+@dataclass
+class PragmaDirective: pass
+
+@dataclass
+class Conditional:
+  condition: Any
+  true_expression: Any
+  false_expression: Any
+
+@dataclass
+class NewExpression:
+  type_name: Any

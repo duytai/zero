@@ -79,17 +79,47 @@ def compute_execution_paths(statement):
     yield path
 
 def generate_execution_paths(root):
+  # Indexing
+  def handler(contract):
+    variables = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
+    functions = [x for x in contract.nodes if isinstance(x, FunctionDefinition)]
+    libraries = [x for x in contract.nodes if isinstance(x, UsingForDirective)]
+    return contract.name, (variables, functions, libraries, contract.base_contracts)
+  # -----> For new contract or interface
+  contracts = dict([handler(x) for x in root.nodes if isinstance(x, ContractDefinition)])
+  # -----> Loading from int tree
   for contract in root.nodes:
     if isinstance(contract, ContractDefinition):
+      variables = []
+      functions = []
+      libraries = []
+      # ----> Inherit tree
+      base_contracts = []
+      stack = contract.base_contracts[::]
+      while stack:
+        item = stack.pop()
+        found = [x for x in base_contracts if x == item]
+        if not found: base_contracts.append(item)
+        ty, canonical_name = item.base_name.name.split(' ')
+        assert ty == 'contract'
+        stack += contracts[canonical_name][3][::]
+      # ----> Inherit properties
+      for iht in base_contracts:
+        ty, canonical_name = iht.base_name.name.split(' ')
+        assert ty == 'contract'
+        variables += contracts[canonical_name][0]
+        functions += contracts[canonical_name][1]
+        libraries += contracts[canonical_name][2]
+      # ----> MyOwn
+      variables += contracts[contract.name][0]
+      functions += contracts[contract.name][1]
+      libraries += contracts[contract.name][2]
+      # ----> Start verifing
       print(f'contract {contract.name}')
-      resources = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
-      for part in contract.nodes:
-        if isinstance(part, FunctionDefinition):
-          if part.body and part.body.statements:
-            print(f'  func {part.name}')
-            for path in compute_execution_paths(part.body):
-              if part.pre:
-                path = part.pre.statements + path
-              if part.post:
-                path += part.post.statements
-              yield resources, part.parameters, part.returns, path
+      for func in functions:
+        if isinstance(func, FunctionDefinition):
+          if func.visibility in ['public', 'external']:
+            if func.body and func.body.statements:
+              print(f'  func {func.name}')
+              for path in compute_execution_paths(func.body):
+                yield contracts, libraries, variables, functions, func, path
