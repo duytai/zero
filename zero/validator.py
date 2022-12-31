@@ -111,68 +111,68 @@ class FunctionRef:
 class VariableRef:
   type_name: Any
   val: Any
-  constraint: Any = BoolVal(True)
-  top: Any = None
+  constraint: Any
+  top: Any
 
   def __lt__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val < other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __le__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val <= other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __gt__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val > other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __ge__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val >= other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __or__(self, other):
     type_name = ElementaryTypeName('bool')
     val = Or([self.val, other.val])
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __and__(self, other):
     type_name = ElementaryTypeName('bool')
     val = And([self.val, other.val])
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __implies__(self, other):
     type_name = ElementaryTypeName('bool')
     val = Implies(self.val, other.val)
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __eq__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val == other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __ne__(self, other):
     type_name = ElementaryTypeName('bool')
     val = self.val != other.val
     constraint = And([self.constraint, other.constraint])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __not__(self):
     type_name = ElementaryTypeName('bool')
     val = Not(self.val)
     constraint = self.constraint
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __add__(self, other):
     type_name = self.type_name
@@ -182,7 +182,7 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __mul__(self, other):
     type_name = self.type_name
@@ -192,7 +192,7 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __truediv__(self, other):
     type_name = self.type_name
@@ -202,7 +202,7 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __mod__(self, other):
     type_name = self.type_name
@@ -212,7 +212,7 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint) 
+    return VariableRef(type_name, val, constraint, None)
 
   def __sub__(self, other):
     type_name = self.type_name
@@ -222,12 +222,18 @@ class VariableRef:
       self.constraint,
       other.constraint
     ])
-    return VariableRef(type_name, val, constraint)
+    return VariableRef(type_name, val, constraint, None)
 
   def __lshift__(self, other):
     if isinstance(self.top, Identifier):
+      type_name = other.type_name
+      val = z3.FreshConst(other.val.sort())
+      constraint = z3.BoolVal(True)
+      tmp = VariableRef(type_name, val, constraint, None)
+      state.add_condition(tmp == other)
+      #
       name = self.top.name
-      state.store_const(name, other)
+      state.store_const(name, tmp)
     else:
       left, prop = self.top
       if isinstance(left.type_name, ArrayTypeName):
@@ -238,7 +244,7 @@ class VariableRef:
           prop.constraint,
           other.constraint
         ])
-        right = VariableRef(type_name, val, constraint)
+        right = VariableRef(type_name, val, constraint, None)
         left << right
       elif isinstance(left.type_name, Mapping):
         type_name = left.type_name
@@ -248,7 +254,7 @@ class VariableRef:
           prop.constraint,
           other.constraint
         ])
-        right = VariableRef(type_name, val, constraint)
+        right = VariableRef(type_name, val, constraint, None)
         left << right
       else:
         raise ValueError(left.type_name)
@@ -262,7 +268,7 @@ class VariableRef:
         self.constraint,
         item.constraint
       ])
-      return VariableRef(type_name, val, constraint)
+      return VariableRef(type_name, val, constraint, None)
     if isinstance(self.type_name, ArrayTypeName):
       type_name = self.type_name.base_type
       val = self.val[item.val]
@@ -271,7 +277,7 @@ class VariableRef:
         self.constraint,
         item.constraint
       ])
-      return VariableRef(type_name, val, constraint)
+      return VariableRef(type_name, val, constraint, None)
 
   def __getattr__(self, key):
     # Check for default properties first
@@ -279,6 +285,11 @@ class VariableRef:
       if self.type_name.name == 'address':
         if key == 'balance':
           return state.fetch_const('@B')[self]
+        if key == 'send':
+          def send(arguments):
+            # TODO: handle send
+            return None
+          return FunctionRef(False, send)
 
     if isinstance(self.type_name, ArrayTypeName):
       # Return the length of array
@@ -288,7 +299,7 @@ class VariableRef:
       constraint = constraint_for_type_name(val, type_name)
       if self.type_name.length:
         constraint = And([constraint, val == int(self.type_name.length.value)])
-      return VariableRef(type_name, val, constraint)
+      return VariableRef(type_name, val, constraint, None)
 
     # Then search for defined properties
     referenced = next(search(self.type_name))
@@ -302,7 +313,7 @@ class VariableRef:
             self.constraint,
             constraint_for_type_name(val, type_name)
           ])
-          return VariableRef(type_name, val, constraint)
+          return VariableRef(type_name, val, constraint, None)
 
     if isinstance(referenced, ContractDefinition):
       if referenced.kind == 'library':
@@ -320,56 +331,42 @@ class VariableRef:
 class StateRef:
   variables: dict
   conditions: Optional[VariableRef] = None
-  runtime_reverts: Optional[VariableRef] = None
-  arith_check: bool = True
 
   def __copy__(self):
     _variables = dict(self.variables.items())
     _conditions = self.conditions
-    _runtime_reverts = self.runtime_reverts
-    _arith_check = self.arith_check
-    return StateRef(_variables, _conditions, _runtime_reverts, _arith_check)
+    return StateRef(_variables, _conditions)
 
   def mk_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
     value = FreshConst(sort)
     constraint = constraint_for_type_name(value, type_name)
-    self.variables[name] = VariableRef(type_name, value, constraint)
+    self.variables[name] = VariableRef(type_name, value, constraint, None)
 
   def mk_default_const(self, name, type_name):
     sort = sort_for_type_name(type_name)
     value = FreshConst(sort)
     constraint = default_for_type_name(value, type_name)
-    self.variables[name] = VariableRef(type_name, value, constraint)
+    self.variables[name] = VariableRef(type_name, value, constraint, None)
 
   def fetch_const(self, name):
     var = self.variables[name]
-    # var.name = name
     return var
 
   def store_const(self, name, var):
-    # var.name = name
     self.variables[name] = var
 
   def add_condition(self, condition):
     self.conditions = self.conditions & condition
-
-  def add_runtime_revert(self, revert):
-    self.runtime_reverts = self.runtime_reverts | (self.conditions & revert)
 
   def init(self):
     self.variables = {}
     self.conditions = VariableRef(
       ElementaryTypeName('bool'),
       BoolVal(True),
-      BoolVal(True)
+      BoolVal(True),
+      None
     )
-    self.runtime_reverts = VariableRef(
-      ElementaryTypeName('bool'),
-      BoolVal(False),
-      BoolVal(True)
-    )
-    self.arith_check = True
 
 state = StateRef({})
 
@@ -481,7 +478,7 @@ def visit_literal(exp):
       int_val = int(exp.value)
     type_name = ElementaryTypeName('uint')
     value = IntVal(int_val)
-    return VariableRef(type_name, value)
+    return VariableRef(type_name, value, BoolVal(True), None)
   raise ValueError(exp.kind)
 
 def visit_function_call(exp):
@@ -527,7 +524,7 @@ def visit_new_expression(exp):
         constraint = default_for_type_name(val, type_name)
         # TODO: add length constraint
         # e = visit_expression(arguments[0])
-        return VariableRef(type_name, val, constraint)
+        return VariableRef(type_name, val, constraint, None)
     raise ValueError(exp)
   return FunctionRef(False, partial(new, exp))
 
@@ -677,6 +674,11 @@ def sol_reverts_if(arguments):
   # TODO: handle reverts if
   return None
 
+# solidity revert()
+def sol_revert(arguments):
+  # TODO: handle revert
+  return None
+
 # solidity interface assignment
 # ICounter ic = ICounter(0x0000)
 def solc_interface(name, arguments):
@@ -746,10 +748,9 @@ def sol_func(function, arguments):
   # Replace idents
   @dataclass
   class B(ExpVisitor):
+    data: Any
     before = []
     mid = []
-    def __init__(self, data):
-      self.data = data
     def visit_identifier(self, exp):
       if exp.name in self.data:
         return Identifier(self.data[exp.name])
@@ -835,6 +836,7 @@ def validate(root):
     state.store_const('address', FunctionRef(False, partial(sol_address)))
     state.store_const('assume', FunctionRef(False, partial(sol_assume)))
     state.store_const('reverts_if', FunctionRef(False, partial(sol_reverts_if)))
+    state.store_const('revert', FunctionRef(False, partial(sol_revert)))
     # Block
     Block = UserDefinedTypeName('struct Block')
     block = VariableDeclaration('block', Block)
