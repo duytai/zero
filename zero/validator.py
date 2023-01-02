@@ -287,8 +287,18 @@ class VariableRef:
           return state.fetch_const('@B')[self]
         if key == 'send':
           def send(arguments):
-            # TODO: handle send
-            return None
+            balances = state.fetch_const('@B')
+            dest = self
+            this = state.fetch_const('this')
+            value = visit_expression(arguments[0])
+            result = balances[this] >= value
+            # TODO: update balance
+            new_val = Store(balances.val, this.val, (balances[this] - value).val)
+            new_val = Store(new_val, dest.val,(balances[this] + value).val)
+            new_constraint = And([balances.constraint, dest.constraint, this.constraint, value.constraint])
+            balances.val = If(result.val, new_val, balances.val)
+            balances.constraint = If(result.val, new_constraint, balances.constraint)
+            return balances[this] >= value
           return FunctionRef(False, send)
 
     if isinstance(self.type_name, ArrayTypeName):
@@ -470,7 +480,7 @@ def visit_literal(exp):
   if exp.kind == 'bool':
     type_name = ElementaryTypeName('bool')
     value = BoolVal(exp.value == 'true')
-    return VariableRef(type_name, value)
+    return VariableRef(type_name, value, BoolVal(True), None)
   if exp.kind == 'number':
     if exp.value.startswith('0x'):
       int_val = int(exp.value, 16)
@@ -627,13 +637,33 @@ def sol_ensures(arguments):
   after_all.append(stmt)
   return FreshConst(BoolSort())
 
+def get_idents(exp):
+  idents = set()
+  stack = [exp]
+  while stack:
+    item = stack.pop()
+    if is_const(item) and not item.children():
+      kind = item.decl().kind()
+      if kind == Z3_OP_UNINTERPRETED:
+        idents.add(item)
+    stack += item.children()
+  return idents
+
 # solidity ok functions
 def sol_ok(arguments):
   arg = visit_expression(arguments[0])
-  assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
+  post = arg.val
+  pre = And([state.conditions.constraint, state.conditions.val, arg.constraint])
+  variables = list(get_idents(pre).difference(get_idents(post)))
+  if variables:
+    assertion = Implies(post, Exists(variables, pre))
+  else:
+    assertion = Implies(post, pre)
+
+  # assertion = And([state.conditions.constraint, state.conditions.val, arg.constraint, arg.val])
   solver = Solver()
-  solver.add(assertion)
-  if solver.check() == sat:
+  solver.add(Not(assertion))
+  if solver.check() == unsat:
     print(colored(f'    ok({arg.val})', 'green'))
   else:
     print(colored(f'    ok({arg.val})', 'yellow'))
@@ -672,11 +702,6 @@ def sol_sum(arguments):
 # solidity reverts_if()
 def sol_reverts_if(arguments):
   # TODO: handle reverts if
-  return None
-
-# solidity revert()
-def sol_revert(arguments):
-  # TODO: handle revert
   return None
 
 # solidity interface assignment
@@ -836,7 +861,6 @@ def validate(root):
     state.store_const('address', FunctionRef(False, partial(sol_address)))
     state.store_const('assume', FunctionRef(False, partial(sol_assume)))
     state.store_const('reverts_if', FunctionRef(False, partial(sol_reverts_if)))
-    state.store_const('revert', FunctionRef(False, partial(sol_revert)))
     # Block
     Block = UserDefinedTypeName('struct Block')
     block = VariableDeclaration('block', Block)

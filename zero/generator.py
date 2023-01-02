@@ -68,6 +68,7 @@ def compute_execution_paths(statement):
   for visited in compute_visited_paths(statement):
     # Execution path stops at revert and return
     path = []
+    revert = False
     for v in construct_execution_path(statement, visited):
       path.append(v)
       if isinstance(v, Return): break
@@ -75,8 +76,10 @@ def compute_execution_paths(statement):
         if isinstance(v.expression, FunctionCall):
           ident = v.expression.expression
           if isinstance(ident, Identifier):
-            if ident.name == 'revert': break
-    yield path
+            revert = ident.name == 'revert'
+            if revert: break
+    if not revert:
+      yield path
 
 def generate_execution_paths(root):
   # Indexing
