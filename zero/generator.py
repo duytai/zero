@@ -110,9 +110,9 @@ def generate_execution_paths(root):
       for iht in base_contracts:
         ty, canonical_name = iht.base_name.name.split(' ')
         assert ty == 'contract'
-        variables += contracts[canonical_name][0]
-        functions += contracts[canonical_name][1]
-        libraries += contracts[canonical_name][2]
+        variables = contracts[canonical_name][0] + variables
+        functions = contracts[canonical_name][1] + functions
+        libraries = contracts[canonical_name][2] + libraries
       # ----> MyOwn
       variables += contracts[contract.name][0]
       functions += contracts[contract.name][1]

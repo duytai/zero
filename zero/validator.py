@@ -348,7 +348,7 @@ class VariableRef:
       if referenced.kind == 'interface':
         for idx, func in enumerate(referenced.nodes):
           if func.name == key:
-            return FunctionRef(False, partial(solc_interface_function, func))
+            return FunctionRef(False, partial(sol_interface_function, func))
 
     raise ValueError(key)
 
@@ -520,6 +520,10 @@ def visit_index_access(exp):
   return tmp
 
 def visit_member_access(exp):
+  if isinstance(exp.expression, Identifier):
+    if exp.expression.name == 'super':
+      name = f'super.{exp.member_name}'
+      return state.fetch_const(name)
   expression = visit_expression(exp.expression)
   tmp = getattr(expression, exp.member_name)
   tmp.top = (expression, exp.member_name)
@@ -721,13 +725,13 @@ def sol_reverts_if(arguments):
 
 # solidity interface assignment
 # ICounter ic = ICounter(0x0000)
-def solc_interface(name, arguments):
+def sol_interface(name, arguments):
   var = visit_expression(arguments[0])
   var.type_name = UserDefinedTypeName(f'contract {name}')
   return var
 
 # solidity interface function
-def solc_interface_function(function, arguments):
+def sol_interface_function(function, arguments):
   returns = []
   for var in function.returns:
     name = next(gn.names())
@@ -860,14 +864,26 @@ def validate(root):
     for name in contracts:
       state.store_const(
         name,
-        FunctionRef(False, partial(solc_interface, name))
+        FunctionRef(False, partial(sol_interface, name))
       )
+    # detect super
+    fc = {}
+    for function in functions:
+      if function.name not in fc: fc[function.name] = 0
+      fc[function.name] += 1
     # visible functions
     for function in functions:
-      state.store_const(
-        function.name,
-        FunctionRef(False, partial(sol_func, function))
-      )
+      if fc[function.name] > 1:
+        state.store_const(
+          f'super.{function.name}',
+          FunctionRef(False, partial(sol_func, function))
+        )
+      else:
+        state.store_const(
+          function.name,
+          FunctionRef(False, partial(sol_func, function))
+        )
+      fc[function.name] -= 1
     # State functions
     state.store_const('ok', FunctionRef(False, partial(sol_ok)))
     state.store_const('assert', FunctionRef(False, partial(sol_assert)))
