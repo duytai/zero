@@ -408,10 +408,13 @@ def visit_assignment(exp):
   if isinstance(exp.left_hand_side, IndexAccess):
     if isinstance(exp.left_hand_side.base_expression, Identifier):
       ident = exp.left_hand_side.base_expression
-      statement = VariableDeclarationStatement([
-        VariableDeclaration(tmp, ElementaryTypeName('uint'))
-      ], exp.left_hand_side)
-      visit_statement(statement)
+      if f'sum_{ident.name}' in state.variables:
+        statement = VariableDeclarationStatement([
+          VariableDeclaration(tmp, ElementaryTypeName('uint'))
+        ], exp.left_hand_side)
+        visit_statement(statement)
+      else:
+        ident = None
 
   left << right
 
@@ -624,6 +627,13 @@ def sol_ensures(arguments):
     statements = []
     def visit_function_call(self, node):
       if isinstance(node.expression, Identifier):
+        if node.expression.name == 'old_address':
+          name = next(gn.names())
+          stmt = VariableDeclarationStatement([
+            VariableDeclaration(name, ElementaryTypeName('address'))
+          ], self.visit_expression(node.arguments[0]))
+          self.statements.append(stmt)
+          return Identifier(name)
         if node.expression.name == 'old_uint':
           name = next(gn.names())
           stmt = VariableDeclarationStatement([
@@ -801,6 +811,18 @@ def sol_func(function, arguments):
       return exp
     def visit_function_call(self, node):
       if isinstance(node.expression, Identifier):
+        if node.expression.name == 'old_address':
+          name = next(gn.names())
+          ident = self.visit_expression(node.arguments[0])
+          stmt = VariableDeclarationStatement([
+            VariableDeclaration(name, ElementaryTypeName('address'))
+          ], ident)
+          self.before.append(stmt)
+          stmt = ExpressionStatement(
+            Assignment(ident, Anything(ElementaryTypeName('address')), '=')
+          )
+          self.mid.append(stmt)
+          return Identifier(name)
         if node.expression.name == 'old_uint':
           name = next(gn.names())
           ident = self.visit_expression(node.arguments[0])
@@ -866,7 +888,7 @@ def validate(root):
         name,
         FunctionRef(False, partial(sol_interface, name))
       )
-    # detect super
+    # Super detection
     fc = {}
     for function in functions:
       if function.name not in fc: fc[function.name] = 0
@@ -896,6 +918,9 @@ def validate(root):
     Block = UserDefinedTypeName('struct Block')
     block = VariableDeclaration('block', Block)
     state.mk_const(block.name, block.type_name)
+    state.mk_const('now', ElementaryTypeName('uint'))
+    now = visit_expression(MemberAccess('timestamp', Identifier('block')))
+    state.store_const('now', now)
     # Msg
     Msg = UserDefinedTypeName('struct Msg')
     msg = VariableDeclaration('msg', Msg)
@@ -916,8 +941,9 @@ def validate(root):
       if isinstance(var.type_name, Mapping):
         type_name = var.type_name
         if isinstance(type_name.value_type, ElementaryTypeName):
-          state.mk_const(f'sum_{var.name}', type_name.value_type)
-          state.store_const(f'sum_uint', FunctionRef(False, partial(sol_sum)))
+          if type_name.value_type.name.startswith('uint'):
+            state.mk_const(f'sum_{var.name}', type_name.value_type)
+            state.store_const(f'sum_uint', FunctionRef(False, partial(sol_sum)))
     # Global variables and parameters
     for var in variables + func.parameters:
       state.mk_const(var.name, var.type_name)

@@ -100,7 +100,7 @@ def generate_execution_paths(root):
       base_contracts = []
       stack = contract.base_contracts[::]
       while stack:
-        item = stack.pop()
+        item = stack.pop(0)
         found = [x for x in base_contracts if x == item]
         if not found: base_contracts.append(item)
         ty, canonical_name = item.base_name.name.split(' ')
