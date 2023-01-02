@@ -285,6 +285,21 @@ class VariableRef:
       if self.type_name.name == 'address':
         if key == 'balance':
           return state.fetch_const('@B')[self]
+        if key == 'transfer':
+          def transfer(arguments):
+            balances = state.fetch_const('@B')
+            dest = self
+            this = state.fetch_const('this')
+            value = visit_expression(arguments[0])
+            state.add_condition(balances[this] >= value)
+            # Update balance
+            new_val = Store(balances.val, this.val, (balances[this] - value).val)
+            new_val = Store(new_val, dest.val,(balances[this] + value).val)
+            new_constraint = And([balances.constraint, dest.constraint, this.constraint, value.constraint])
+            balances.val = new_val
+            balances.constraint = new_constraint
+            return None
+          return FunctionRef(False, transfer)
         if key == 'send':
           def send(arguments):
             balances = state.fetch_const('@B')
@@ -292,7 +307,7 @@ class VariableRef:
             this = state.fetch_const('this')
             value = visit_expression(arguments[0])
             result = balances[this] >= value
-            # TODO: update balance
+            # Update balance
             new_val = Store(balances.val, this.val, (balances[this] - value).val)
             new_val = Store(new_val, dest.val,(balances[this] + value).val)
             new_constraint = And([balances.constraint, dest.constraint, this.constraint, value.constraint])
