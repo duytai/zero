@@ -345,10 +345,12 @@ class VariableRef:
         for idx, func in enumerate(referenced.nodes):
           if func.name == key:
             return FunctionRef(True, partial(sol_func, func))
-      if referenced.kind == 'interface':
-        for idx, func in enumerate(referenced.nodes):
+      for idx, func in enumerate(referenced.nodes):
           if func.name == key:
+            if func.body:
+              return FunctionRef(False, partial(sol_func, func))
             return FunctionRef(False, partial(sol_interface_function, func))
+
     raise ValueError(key)
 
 @dataclass
