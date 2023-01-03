@@ -93,6 +93,7 @@ class VariableDeclaration:
 
 @dataclass
 class FunctionDefinition:
+  id: int
   name: str
   parameters: List[VariableDeclaration]
   returns: List[VariableDeclaration]

@@ -48,11 +48,45 @@ def type_search(root, libraries, type_name):
 
   raise ValueError(type_name)
 
+def modifies(root):
+  # ----> Indexing
+  def handler(contract):
+    variables = [x for x in contract.nodes if isinstance(x, VariableDeclaration)]
+    functions = [x for x in contract.nodes if isinstance(x, FunctionDefinition)]
+    libraries = [x for x in contract.nodes if isinstance(x, UsingForDirective)]
+    return contract.name, (variables, functions, libraries, contract.base_contracts)
+  contracts = dict([handler(x) for x in root.nodes if isinstance(x, ContractDefinition)])
+  # ----> Inherit
+  for contract in root.nodes:
+    if isinstance(contract, ContractDefinition):
+      variables, functions, libraries = [], [], []
+      # ----> Tree
+      base_contracts = []
+      stack = contract.base_contracts[::]
+      while stack:
+        item = stack.pop(0)
+        found = [x for x in base_contracts if x == item]
+        if not found: base_contracts.append(item)
+        ty, canonical_name = item.base_name.name.split(' ')
+        assert ty == 'contract'
+        stack += contracts[canonical_name][3][::]
+      # ----> Inherit properties
+      for iht in base_contracts:
+        ty, canonical_name = iht.base_name.name.split(' ')
+        assert ty == 'contract'
+        variables = contracts[canonical_name][0] + variables
+        functions = contracts[canonical_name][1] + functions
+        libraries = contracts[canonical_name][2] + libraries
+      # ----> MyOwn
+      contract.nodes = libraries + variables + functions + contract.nodes
+  return root
+
+
 def parse(node):
 
   if node['nodeType'] == 'SourceUnit':
     nodes = [parse(x) for x in node['nodes']]
-    return SourceUnit(nodes)
+    return modifies(SourceUnit(nodes))
 
   if node['nodeType'] == 'ContractDefinition':
     kind = node['contractKind']
@@ -62,13 +96,14 @@ def parse(node):
     return ContractDefinition(base_contracts, kind, name, nodes)
 
   if node['nodeType'] == 'FunctionDefinition':
+    fid = node['id']
     name = node['name']
     parameters = [parse(x) for x in node['parameters']['parameters']]
     returns = [parse(x) for x in node['returnParameters']['parameters']]
     body = parse(node['body']) if node['body'] else None
     visibility = node['visibility']
     modifiers = [parse(x) for x in node['modifiers']]
-    return FunctionDefinition(name, parameters, returns, body, visibility, modifiers)
+    return FunctionDefinition(fid, name, parameters, returns, body, visibility, modifiers)
 
   if node['nodeType'] == 'VariableDeclaration':
     name = node['name']
@@ -128,6 +163,12 @@ def parse(node):
     kind = node['kind']
     expression = parse(node['expression'])
     arguments = [parse(x) for x in node['arguments']]
+    if isinstance(expression, MemberAccess):
+      ident = expression.expression
+      if isinstance(ident, Identifier):
+        if ident.name == 'super':
+          fid = node['expression']['referencedDeclaration']
+          expression = Identifier(f'{expression.member_name}{fid}')
     return FunctionCall(kind, expression, arguments)
 
   if node['nodeType'] == 'Mapping':
