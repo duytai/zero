@@ -31,6 +31,29 @@ def unroll_loop_statements(statement):
     ])
   return statement
 
+def use_loop_invariant(statement):
+  if isinstance(statement, Block):
+    return Block([use_loop_invariant(x) for x in statement.statements])
+  elif isinstance(statement, IfStatement):
+    return IfStatement(
+      statement.condition,
+      use_loop_invariant(statement.true_body),
+      use_loop_invariant(statement.false_body) if statement.false_body else None
+    )
+  elif isinstance(statement, ForStatement):
+    stmt = statement.body.statements[0]
+    if isinstance(stmt, ExpressionStatement):
+      if isinstance(stmt.expression, FunctionCall):
+        if isinstance(stmt.expression.expression, Identifier):
+          if stmt.expression.expression.name == 'assume':
+            init = VariableDeclarationStatement(
+              statement.init.declarations,
+              Anything(statement.init.declarations[0].type_name)
+            )
+            return Block([init, stmt, to_assume([UnaryOperation(statement.condition, True, '!')])])
+    raise ValueError('Loop invariant ?')
+  return statement
+
 def count_if_statements(statement):
   if isinstance(statement, Block):
     for statement in statement.statements:
@@ -69,7 +92,8 @@ def compute_visited_paths(statement):
   return visited_paths
 
 def compute_execution_paths(statement):
-  statement = unroll_loop_statements(statement)
+  # statement = unroll_loop_statements(statement)
+  statement = use_loop_invariant(statement)
   for visited in compute_visited_paths(statement):
     # Execution path stops at revert and return
     path = []
