@@ -184,6 +184,16 @@ class VariableRef:
     ])
     return VariableRef(type_name, val, constraint, None)
 
+  def __pow__(self, other):
+    type_name = self.type_name
+    val = ToInt(self.val**other.val)
+    constraint = And([
+      constraint_for_type_name(val, type_name),
+      self.constraint,
+      other.constraint
+    ])
+    return VariableRef(type_name, val, constraint, None)
+
   def __mul__(self, other):
     type_name = self.type_name
     val = self.val * other.val
@@ -446,6 +456,8 @@ def visit_binary_operation(exp):
     return left_expression - right_expression
   if exp.operator == '*':
     return left_expression * right_expression
+  if exp.operator == '**':
+    return left_expression ** right_expression
   if exp.operator == '/':
     return left_expression / right_expression
   if exp.operator == '>':
@@ -538,9 +550,7 @@ def visit_nothing(exp):
   return FreshConst(BoolSort())
 
 def visit_elementary_type_name_expression(exp):
-  if exp.name == 'address':
-    return state.fetch_const('address')
-  raise ValueError(exp)
+  return state.fetch_const(exp.name)
 
 def visit_new_expression(exp):
   def new(exp, arguments):
@@ -606,8 +616,7 @@ def visit_statement(statement, returns=None):
   elif isinstance(statement, EmitStatement):
     pass
   else:
-    condition = visit_expression(statement)
-    state.add_condition(condition)
+    raise ValueError(statement)
 
 # solidity ensures functions
 def sol_ensures(arguments):
@@ -704,6 +713,8 @@ def sol_assert(arguments):
   if solver.check() == unsat:
     print(colored(f'    assert({arg.val})', 'green'))
   else:
+    if 'cnt' in state.variables:
+      print(solver.model().eval(state.variables['cnt'].val))
     print(colored(f'    assert({arg.val})', 'yellow'))
 
 # solidity require function
@@ -718,6 +729,10 @@ def sol_assume(arguments):
 
 # solidity address cast function
 def sol_address(arguments):
+  return visit_expression(arguments[0])
+
+# solidity uint cast funciton
+def sol_uint(arguments):
   return visit_expression(arguments[0])
 
 # solidity sum(balances)
@@ -901,6 +916,7 @@ def validate(root):
     state.store_const('require', FunctionRef(False, partial(sol_require)))
     state.store_const('ensures', FunctionRef(False, partial(sol_ensures)))
     state.store_const('address', FunctionRef(False, partial(sol_address)))
+    state.store_const('uint', FunctionRef(False, partial(sol_uint)))
     state.store_const('assume', FunctionRef(False, partial(sol_assume)))
     state.store_const('reverts_if', FunctionRef(False, partial(sol_reverts_if)))
     # Block

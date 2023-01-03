@@ -1,5 +1,10 @@
 from .parser import *
 
+def to_assume(arguments):
+  return ExpressionStatement(
+    FunctionCall('functionCall', Identifier('assume'), arguments)
+  )
+
 def unroll_loop_statements(statement):
   if isinstance(statement, Block):
     return Block([unroll_loop_statements(x) for x in statement.statements])
@@ -18,11 +23,11 @@ def unroll_loop_statements(statement):
     return Block([
       statement.init,
       Block(num_unrolled * [
-        statement.condition,
+        to_assume([statement.condition]),
         statement.body,
         statement.loop,
       ]),
-      UnaryOperation(statement.condition, True, '!'),
+      to_assume([UnaryOperation(statement.condition, True, '!')])
     ])
   return statement
 
@@ -42,10 +47,10 @@ def construct_execution_path(statement, path=[]):
       yield from construct_execution_path(statement, path)
   elif isinstance(statement, IfStatement):
     if path.pop():
-      yield statement.condition
+      yield to_assume([statement.condition])
       yield from construct_execution_path(statement.true_body, path)
     else:
-      yield UnaryOperation(statement.condition, True, '!')
+      yield to_assume([UnaryOperation(statement.condition, True, '!')])
       if statement.false_body:
         yield from construct_execution_path(statement.false_body, path)
   else:

@@ -218,7 +218,9 @@ def parse(node):
     return Return(expression)
 
   if node['nodeType'] == 'ElementaryTypeNameExpression':
-    return ElementaryTypeNameExpression(node['typeName'])
+    name = node['typeName']
+    if name == 'uint256': name = 'uint'
+    return ElementaryTypeNameExpression(name)
 
   if node['nodeType'] == 'UsingForDirective':
     type_name = parse(node['typeName'])
