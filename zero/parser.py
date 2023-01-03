@@ -112,6 +112,7 @@ def parse(node):
 
   if node['nodeType'] == 'ElementaryTypeName':
     name = node['name']
+    if name == 'uint256': name = 'uint'
     return ElementaryTypeName(name)
 
   if node['nodeType'] == 'Block':
